@@ -11,7 +11,6 @@ import {
 import { useRouter, usePathname } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/IconSymbol';
-import { BlurView } from 'expo-blur';
 import { useTheme } from '@react-navigation/native';
 import Animated, {
   useAnimatedStyle,
@@ -112,93 +111,72 @@ export default function FloatingTabBar({
     };
   });
 
-  // Dynamic styles based on theme
+  // Dynamic styles based on theme - fully opaque
   const dynamicStyles = {
-    blurContainer: {
-      ...styles.blurContainer,
+    footerContainer: {
+      ...styles.footerContainer,
+      backgroundColor: theme.dark
+        ? '#1C1C1E' // Solid dark background
+        : '#FFFFFF', // Solid white background
+      borderTopWidth: 1,
+      borderTopColor: theme.dark
+        ? 'rgba(255, 255, 255, 0.1)'
+        : 'rgba(0, 0, 0, 0.1)',
       ...Platform.select({
-        ios: {
-          backgroundColor: theme.dark
-            ? 'rgba(28, 28, 30, 0.95)'
-            : 'rgba(255, 255, 255, 0.95)',
-        },
         android: {
-          backgroundColor: theme.dark
-            ? 'rgba(28, 28, 30, 0.98)'
-            : 'rgba(255, 255, 255, 0.98)',
           elevation: 8,
         },
         web: {
-          backgroundColor: theme.dark
-            ? 'rgba(28, 28, 30, 0.98)'
-            : 'rgba(255, 255, 255, 0.98)',
-          backdropFilter: 'blur(10px)',
           boxShadow: theme.dark
             ? '0 -2px 10px rgba(0, 0, 0, 0.3)'
             : '0 -2px 10px rgba(0, 0, 0, 0.1)',
         },
       }),
-      borderTopWidth: 1,
-      borderTopColor: theme.dark
-        ? 'rgba(255, 255, 255, 0.1)'
-        : 'rgba(0, 0, 0, 0.1)',
-    },
-    background: {
-      ...styles.background,
-      backgroundColor: theme.dark
-        ? (Platform.OS === 'ios' ? 'transparent' : 'rgba(28, 28, 30, 0.05)')
-        : (Platform.OS === 'ios' ? 'transparent' : 'rgba(255, 255, 255, 0.05)'),
     },
     indicator: {
       ...styles.indicator,
       backgroundColor: theme.dark
-        ? 'rgba(255, 255, 255, 0.1)' // Subtle white overlay in dark mode
-        : 'rgba(0, 0, 0, 0.05)', // Subtle black overlay in light mode
+        ? 'rgba(255, 255, 255, 0.15)' // Subtle white overlay in dark mode
+        : 'rgba(0, 0, 0, 0.08)', // Subtle black overlay in light mode
       width: screenWidth / tabs.length,
     },
   };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-      <View style={styles.container}>
-        <BlurView
-          intensity={Platform.OS === 'web' ? 0 : 80}
-          style={dynamicStyles.blurContainer}
-        >
-          <View style={dynamicStyles.background} />
-          <Animated.View style={[dynamicStyles.indicator, indicatorStyle]} />
-          <View style={styles.tabsContainer}>
-            {tabs.map((tab, index) => {
-              const isActive = activeTabIndex === index;
+      <View style={dynamicStyles.footerContainer}>
+        <Animated.View style={[dynamicStyles.indicator, indicatorStyle]} />
+        <View style={styles.tabsContainer}>
+          {tabs.map((tab, index) => {
+            const isActive = activeTabIndex === index;
 
-              return (
-                <TouchableOpacity
-                  key={tab.name}
-                  style={styles.tab}
-                  onPress={() => handleTabPress(tab.route)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.tabContent}>
-                    <IconSymbol
-                      name={tab.icon}
-                      size={24}
-                      color={isActive ? theme.colors.primary : (theme.dark ? '#98989D' : '#8E8E93')}
-                    />
-                    <Text
-                      style={[
-                        styles.tabLabel,
-                        { color: theme.dark ? '#98989D' : '#8E8E93' },
-                        isActive && { color: theme.colors.primary, fontWeight: '600' },
-                      ]}
-                    >
-                      {tab.label}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </BlurView>
+            return (
+              <TouchableOpacity
+                key={tab.name}
+                style={styles.tab}
+                onPress={() => handleTabPress(tab.route)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.tabContent}>
+                  <IconSymbol
+                    name={tab.icon}
+                    size={24}
+                    color={isActive ? theme.colors.primary : (theme.dark ? '#98989D' : '#8E8E93')}
+                  />
+                  <Text
+                    style={[
+                      styles.tabLabel,
+                      { color: theme.dark ? '#98989D' : '#8E8E93' },
+                      isActive && { color: theme.colors.primary, fontWeight: '600' },
+                    ]}
+                  >
+                    {tab.label}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -212,15 +190,9 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 1000,
   },
-  container: {
-    width: '100%',
-  },
-  blurContainer: {
+  footerContainer: {
     width: '100%',
     overflow: 'hidden',
-  },
-  background: {
-    ...StyleSheet.absoluteFillObject,
   },
   indicator: {
     position: 'absolute',
