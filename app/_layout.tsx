@@ -83,6 +83,48 @@ export default function RootLayout() {
                     title: 'Book Service'
                   }} 
                 />
+                <Stack.Screen 
+                  name="orders" 
+                  options={{ 
+                    presentation: 'card',
+                    headerShown: false,
+                  }} 
+                />
+                <Stack.Screen 
+                  name="business-management" 
+                  options={{ 
+                    presentation: 'modal',
+                    headerShown: false,
+                  }} 
+                />
+                <Stack.Screen 
+                  name="products" 
+                  options={{ 
+                    presentation: 'card',
+                    headerShown: false,
+                  }} 
+                />
+                <Stack.Screen 
+                  name="wallet" 
+                  options={{ 
+                    presentation: 'card',
+                    headerShown: false,
+                  }} 
+                />
+                <Stack.Screen 
+                  name="reviews" 
+                  options={{ 
+                    presentation: 'modal',
+                    headerShown: false,
+                  }} 
+                />
+                <Stack.Screen 
+                  name="checkout" 
+                  options={{ 
+                    presentation: 'card',
+                    headerShown: false,
+                  }} 
+                />
                 <Stack.Screen name="modal" options={{ presentation: "modal" }} />
                 <Stack.Screen
                   name="formsheet"

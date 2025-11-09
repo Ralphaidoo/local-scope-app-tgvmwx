@@ -33,10 +33,10 @@ export default function DashboardScreen() {
   ];
 
   const quickActions = [
-    { label: 'Add Product', icon: 'plus.circle.fill', route: '/products/add' },
-    { label: 'Manage Orders', icon: 'bag', route: '/orders/manage' },
-    { label: 'View Bookings', icon: 'calendar', route: '/bookings/manage' },
-    { label: 'Wallet', icon: 'creditcard', route: '/wallet' },
+    { label: 'Manage Products', icon: 'bag.fill', route: '/products' },
+    { label: 'View Orders', icon: 'list.bullet', route: '/orders' },
+    { label: 'Wallet', icon: 'sterlingsign.circle.fill', route: '/wallet' },
+    { label: 'Edit Business', icon: 'pencil', route: '/business-management' },
   ];
 
   return (
@@ -82,7 +82,7 @@ export default function DashboardScreen() {
             {quickActions.map(action => (
               <Pressable
                 key={action.label}
-                onPress={() => console.log('Navigate to:', action.route)}
+                onPress={() => router.push(action.route as any)}
               >
                 <GlassView
                   style={[
@@ -91,7 +91,7 @@ export default function DashboardScreen() {
                   ]}
                   glassEffectStyle="regular"
                 >
-                  <IconSymbol name={action.icon} color={theme.colors.primary} size={32} />
+                  <IconSymbol name={action.icon} color="#007AFF" size={32} />
                   <Text style={[styles.actionLabel, { color: theme.colors.text }]}>{action.label}</Text>
                 </GlassView>
               </Pressable>
