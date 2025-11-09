@@ -25,7 +25,6 @@ interface User {
   id: string;
   full_name: string;
   email: string;
-  role: string;
   user_type: string;
   subscription_plan: string;
   created_at: string;
@@ -152,7 +151,7 @@ export default function AdminScreen() {
       const { count: adminsCount } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
-        .eq('role', 'admin');
+        .eq('user_type', 'admin');
 
       // Get total businesses
       const { count: businessesCount } = await supabase
@@ -168,7 +167,7 @@ export default function AdminScreen() {
       const { data: revenueData } = await supabase
         .from('orders')
         .select('total_amount')
-        .eq('payment_status', 'completed');
+        .eq('payment_status', 'paid');
 
       const totalRevenue = revenueData?.reduce((sum, order) => sum + Number(order.total_amount), 0) || 0;
 
@@ -209,8 +208,8 @@ export default function AdminScreen() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, email, role, user_type, subscription_plan, created_at')
-        .neq('role', 'admin')
+        .select('id, full_name, email, user_type, subscription_plan, created_at')
+        .neq('user_type', 'admin')
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -225,8 +224,8 @@ export default function AdminScreen() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, email, role, user_type, subscription_plan, created_at')
-        .eq('role', 'admin')
+        .select('id, full_name, email, user_type, subscription_plan, created_at')
+        .eq('user_type', 'admin')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -327,17 +326,10 @@ export default function AdminScreen() {
               } else if (action === 'promote') {
                 const { error } = await supabase
                   .from('profiles')
-                  .update({ role: 'admin', user_type: 'admin' })
+                  .update({ user_type: 'admin' })
                   .eq('id', userId);
                 if (error) throw error;
               }
-
-              // Log admin action
-              await supabase.from('admin_actions').insert({
-                action_type: action,
-                target_type: 'user',
-                target_id: userId,
-              });
 
               Alert.alert('Success', `User ${action}ed successfully`);
               loadUsers();
@@ -381,29 +373,23 @@ export default function AdminScreen() {
       if (authError) throw authError;
 
       if (authData.user) {
-        // Create admin profile
+        // Wait for trigger to create profile
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Update the profile to ensure admin status
         const { error: profileError } = await supabase
           .from('profiles')
-          .insert({
-            user_id: authData.user.id,
-            email: newAdmin.email,
+          .update({
             full_name: newAdmin.fullName,
-            role: 'admin',
             user_type: 'admin',
             subscription_plan: 'pro',
-            business_listing_count: 0,
             has_completed_onboarding: true,
-          });
+          })
+          .eq('user_id', authData.user.id);
 
-        if (profileError) throw profileError;
-
-        // Log admin action
-        await supabase.from('admin_actions').insert({
-          action_type: 'create_admin',
-          target_type: 'user',
-          target_id: authData.user.id,
-          details: { email: newAdmin.email, full_name: newAdmin.fullName },
-        });
+        if (profileError) {
+          console.log('Profile update error:', profileError);
+        }
 
         Alert.alert(
           'Success',
@@ -440,17 +426,10 @@ export default function AdminScreen() {
             try {
               const { error } = await supabase
                 .from('profiles')
-                .update({ role: 'customer', user_type: 'customer' })
+                .update({ user_type: 'customer' })
                 .eq('id', userId);
 
               if (error) throw error;
-
-              // Log admin action
-              await supabase.from('admin_actions').insert({
-                action_type: 'remove_admin',
-                target_type: 'user',
-                target_id: userId,
-              });
 
               Alert.alert('Success', 'Admin privileges removed successfully');
               loadAdminUsers();
@@ -475,14 +454,6 @@ export default function AdminScreen() {
 
       if (error) throw error;
 
-      // Log admin action
-      await supabase.from('admin_actions').insert({
-        action_type: 'moderate_business',
-        target_type: 'business',
-        target_id: businessId,
-        details: { status },
-      });
-
       Alert.alert('Success', `Business ${status} successfully`);
       loadBusinesses();
       loadStats();
@@ -500,14 +471,6 @@ export default function AdminScreen() {
         .eq('id', businessId);
 
       if (error) throw error;
-
-      // Log admin action
-      await supabase.from('admin_actions').insert({
-        action_type: 'toggle_featured',
-        target_type: 'business',
-        target_id: businessId,
-        details: { featured: !currentFeatured },
-      });
 
       Alert.alert('Success', `Business ${!currentFeatured ? 'featured' : 'unfeatured'} successfully`);
       loadBusinesses();
@@ -536,14 +499,6 @@ export default function AdminScreen() {
                 .eq('id', withdrawalId);
 
               if (error) throw error;
-
-              // Log admin action
-              await supabase.from('admin_actions').insert({
-                action_type: 'process_withdrawal',
-                target_type: 'withdrawal',
-                target_id: withdrawalId,
-                details: { status: action },
-              });
 
               Alert.alert('Success', `Withdrawal ${action} successfully`);
               loadWithdrawals();
@@ -575,13 +530,6 @@ export default function AdminScreen() {
       });
 
       if (error) throw error;
-
-      // Log admin action
-      await supabase.from('admin_actions').insert({
-        action_type: 'create_promo_code',
-        target_type: 'promo_code',
-        details: { code: newPromoCode.code },
-      });
 
       Alert.alert('Success', 'Promo code created successfully');
       setShowPromoModal(false);
@@ -642,13 +590,6 @@ export default function AdminScreen() {
               await Promise.all(
                 keysToRemove.map(key => AsyncStorage.removeItem(key))
               );
-
-              // Log admin action
-              await supabase.from('admin_actions').insert({
-                action_type: 'delete_sample_data',
-                target_type: 'system',
-                details: { cleared_keys: keysToRemove },
-              });
 
               Alert.alert(
                 'Success',
@@ -905,9 +846,9 @@ export default function AdminScreen() {
         </Text>
       </View>
 
-      {users.map((user) => (
+      {users.map((userItem) => (
         <GlassView
-          key={user.id}
+          key={userItem.id}
           style={[
             styles.listCard,
             Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
@@ -917,30 +858,30 @@ export default function AdminScreen() {
           <View style={styles.listCardHeader}>
             <View style={styles.listCardInfo}>
               <Text style={[styles.listCardTitle, { color: theme.colors.text }]}>
-                {user.full_name || 'No name'}
+                {userItem.full_name || 'No name'}
               </Text>
               <Text style={[styles.listCardSubtitle, { color: theme.dark ? '#98989D' : '#666' }]}>
-                {user.email}
+                {userItem.email}
               </Text>
               <View style={styles.badgeContainer}>
-                <View style={[styles.badge, { backgroundColor: user.role === 'admin' ? '#FF3B30' : '#007AFF' }]}>
-                  <Text style={styles.badgeText}>{user.role || user.user_type}</Text>
+                <View style={[styles.badge, { backgroundColor: userItem.user_type === 'admin' ? '#FF3B30' : '#007AFF' }]}>
+                  <Text style={styles.badgeText}>{userItem.user_type}</Text>
                 </View>
-                <View style={[styles.badge, { backgroundColor: user.subscription_plan === 'pro' ? '#FFD700' : '#8E8E93' }]}>
-                  <Text style={styles.badgeText}>{user.subscription_plan || 'free'}</Text>
+                <View style={[styles.badge, { backgroundColor: userItem.subscription_plan === 'pro' ? '#FFD700' : '#8E8E93' }]}>
+                  <Text style={styles.badgeText}>{userItem.subscription_plan || 'free'}</Text>
                 </View>
               </View>
             </View>
           </View>
 
           <View style={styles.listCardActions}>
-            {user.role !== 'admin' && (
+            {userItem.user_type !== 'admin' && (
               <Pressable
                 style={({ pressed }) => [
                   styles.actionButton,
                   { opacity: pressed ? 0.7 : 1, backgroundColor: '#007AFF' }
                 ]}
-                onPress={() => handleUserAction(user.id, 'promote')}
+                onPress={() => handleUserAction(userItem.id, 'promote')}
               >
                 <Text style={styles.actionButtonText}>Make Admin</Text>
               </Pressable>
@@ -950,7 +891,7 @@ export default function AdminScreen() {
                 styles.actionButton,
                 { opacity: pressed ? 0.7 : 1, backgroundColor: '#FF3B30' }
               ]}
-              onPress={() => handleUserAction(user.id, 'delete')}
+              onPress={() => handleUserAction(userItem.id, 'delete')}
             >
               <Text style={styles.actionButtonText}>Delete</Text>
             </Pressable>

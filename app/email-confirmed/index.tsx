@@ -1,15 +1,16 @@
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Pressable, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@react-navigation/native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { GlassView } from 'expo-glass-effect';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 
 export default function EmailConfirmedScreen() {
   const theme = useTheme();
+  const params = useLocalSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Verifying your email...');
 
@@ -19,27 +20,33 @@ export default function EmailConfirmedScreen() {
 
   const handleEmailConfirmation = async () => {
     try {
+      console.log('Email confirmation params:', params);
+      
+      // Wait a moment for the auth state to update
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
       // Get the current session to check if email is verified
       const { data: { session }, error } = await supabase.auth.getSession();
 
       if (error) {
         console.log('Email confirmation error:', error);
         setStatus('error');
-        setMessage('Failed to verify email. Please try again.');
+        setMessage('Failed to verify email. Please try again or contact support.');
         return;
       }
 
       if (session) {
-        console.log('Email confirmed successfully');
+        console.log('Email confirmed successfully, user has active session');
         setStatus('success');
-        setMessage('Email verified successfully!');
+        setMessage('Email verified successfully! Redirecting to your dashboard...');
         
         // Wait a moment before redirecting
         setTimeout(() => {
           router.replace('/(tabs)/(home)/');
         }, 2000);
       } else {
-        // No session yet, might need to wait for the auth state change
+        // No session yet, email was verified but user needs to sign in
+        console.log('Email verified but no active session');
         setStatus('success');
         setMessage('Email verified! Please sign in to continue.');
         
@@ -50,13 +57,20 @@ export default function EmailConfirmedScreen() {
     } catch (err) {
       console.log('Email confirmation error:', err);
       setStatus('error');
-      setMessage('An error occurred. Please try signing in.');
+      setMessage('An error occurred during verification. Please try signing in.');
     }
   };
 
   const handleContinue = () => {
     if (status === 'success') {
-      router.replace('/(tabs)/(home)/');
+      // Check if we have a session
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          router.replace('/(tabs)/(home)/');
+        } else {
+          router.replace('/auth');
+        }
+      });
     } else {
       router.replace('/auth');
     }
@@ -96,7 +110,10 @@ export default function EmailConfirmedScreen() {
                 {message}
               </Text>
               <Pressable
-                style={styles.button}
+                style={({ pressed }) => [
+                  styles.button,
+                  { opacity: pressed ? 0.8 : 1 }
+                ]}
                 onPress={handleContinue}
               >
                 <Text style={styles.buttonText}>Continue</Text>
@@ -110,13 +127,16 @@ export default function EmailConfirmedScreen() {
                 <IconSymbol name="xmark.circle.fill" size={64} color="#fff" />
               </View>
               <Text style={[styles.title, { color: theme.colors.text }]}>
-                Verification Failed
+                Verification Issue
               </Text>
               <Text style={[styles.message, { color: theme.dark ? '#98989D' : '#666' }]}>
                 {message}
               </Text>
               <Pressable
-                style={styles.button}
+                style={({ pressed }) => [
+                  styles.button,
+                  { opacity: pressed ? 0.8 : 1 }
+                ]}
                 onPress={handleContinue}
               >
                 <Text style={styles.buttonText}>Go to Sign In</Text>
@@ -167,6 +187,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 24,
+    lineHeight: 22,
   },
   button: {
     backgroundColor: '#007AFF',

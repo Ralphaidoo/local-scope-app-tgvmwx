@@ -63,8 +63,7 @@ export default function EditProfileScreen() {
         console.log('No active session found');
         Alert.alert('Session Expired', 'Your session has expired. Please log in again.');
         setIsLoading(false);
-        // Optionally redirect to login
-        // router.replace('/auth');
+        router.replace('/auth');
         return;
       }
 
@@ -252,25 +251,22 @@ export default function EditProfileScreen() {
           </View>
         </GlassView>
 
-        {/* Save Button - Now outside GlassView for better touch handling */}
-        <View style={styles.buttonContainer}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.saveButton,
-              { 
-                backgroundColor: isLoading ? '#999' : '#007AFF',
-                opacity: pressed ? 0.8 : 1,
-              }
-            ]}
-            onPress={handleSave}
-            disabled={isLoading}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Text style={styles.saveButtonText}>
-              {isLoading ? 'Saving...' : 'Save Changes'}
-            </Text>
-          </Pressable>
-        </View>
+        {/* Save Button */}
+        <Pressable
+          style={({ pressed }) => [
+            styles.saveButton,
+            { 
+              backgroundColor: isLoading ? '#999' : '#007AFF',
+              opacity: pressed ? 0.8 : 1,
+            }
+          ]}
+          onPress={handleSave}
+          disabled={isLoading}
+        >
+          <Text style={styles.saveButtonText}>
+            {isLoading ? 'Saving...' : 'Save Changes'}
+          </Text>
+        </Pressable>
 
         {/* Info Card */}
         <GlassView
@@ -366,15 +362,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
     lineHeight: 16,
   },
-  buttonContainer: {
-    marginBottom: 16,
-    zIndex: 10,
-  },
   saveButton: {
     height: 52,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
