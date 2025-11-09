@@ -27,7 +27,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
-  const [refreshCounter, setRefreshCounter] = useState(0);
+
+  // Updated loadProfile function as requested
+  const loadProfile = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, user_id, email, full_name, user_type, subscription_plan')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    console.log('Loaded profile from Supabase:', data);
+
+    if (error) {
+      console.error('Profile fetch error:', error);
+      return;
+    }
+
+    if (data) {
+      setUser({
+        id: data.id,
+        email: data.email || '',
+        fullName: data.full_name || '',
+        userType: data.user_type, // normalize key
+        createdAt: new Date().toISOString(),
+        subscriptionPlan: (data.subscription_plan as SubscriptionPlan) || 'free',
+        businessListingCount: 0,
+      });
+    }
+  };
 
   useEffect(() => {
     // Get initial session
@@ -40,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Initial session:', session?.user?.id);
       setSession(session);
       if (session?.user) {
-        loadUserProfile(session.user.id, session.user.email || '');
+        loadProfile(session.user.id).finally(() => setIsLoading(false));
       } else {
         setIsLoading(false);
       }
@@ -57,237 +84,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
         
-        // FIXED: Fetch profile using user_id and normalize user_type to userType
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .single();
-        
-        if (!error && data) {
-          console.log('Profile data fetched in auth listener:', data);
-          
-          // Map user_type to userType for consistent access in JSX
-          const userData: User = {
-            id: data.id,
-            email: data.email || session.user.email || '',
-            fullName: data.full_name || '',
-            userType: data.user_type || 'customer', // Normalized field
-            phone: data.phone || undefined,
-            createdAt: data.created_at || new Date().toISOString(),
-            subscriptionPlan: (data.subscription_plan as SubscriptionPlan) || 'free',
-            businessListingCount: data.business_listing_count || 0,
-          };
-          
-          console.log('Setting user from auth listener with userType:', userData.userType);
-          setUser(userData);
-        } else {
-          console.log('Error fetching profile in auth listener:', error);
-          // Fallback to loading profile with retry logic
-          await loadUserProfile(session.user.id, session.user.email || '');
-        }
+        // Call loadProfile after auth state change
+        await loadProfile(session.user.id);
       } else {
         setUser(null);
-        setIsLoading(false);
       }
+      setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
-
-  const loadUserProfile = async (userId: string, userEmail: string, forceRefresh: boolean = false) => {
-    try {
-      console.log('Loading user profile for:', userId, 'Force refresh:', forceRefresh);
-      
-      if (forceRefresh) {
-        // When force refreshing, directly fetch from database without retries
-        // Add a timestamp to bust any potential caching
-        const timestamp = Date.now();
-        console.log('Force refresh with timestamp:', timestamp);
-        
-        // FIXED: Query using user_id instead of id
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .single();
-
-        if (error) {
-          console.log('Error force refreshing profile:', error);
-          throw error;
-        }
-
-        if (profile) {
-          console.log('Profile force refreshed successfully:', {
-            id: profile.id,
-            email: profile.email,
-            user_type: profile.user_type,
-            role: profile.role,
-            full_name: profile.full_name
-          });
-          
-          // FIXED: Map user_type to userType for consistent access in JSX
-          const actualUserType: UserType = profile.user_type || 'customer';
-          
-          console.log('User type from profile:', actualUserType);
-          console.log('Is admin check (user.userType === admin):', actualUserType === 'admin');
-          
-          const userData: User = {
-            id: profile.id,
-            email: profile.email || userEmail,
-            fullName: profile.full_name || '',
-            userType: actualUserType, // Normalized field
-            phone: profile.phone || undefined,
-            createdAt: profile.created_at || new Date().toISOString(),
-            subscriptionPlan: (profile.subscription_plan as SubscriptionPlan) || 'free',
-            businessListingCount: profile.business_listing_count || 0,
-          };
-          
-          console.log('Setting refreshed user data with userType:', userData.userType);
-          console.log('Full user data being set:', JSON.stringify(userData, null, 2));
-          
-          // Force a complete state update by setting to null first, then the new data
-          // This ensures React detects the change
-          setUser(null);
-          // Use setTimeout to ensure the null state is processed
-          setTimeout(() => {
-            setUser(userData);
-            setRefreshCounter(prev => prev + 1);
-            setIsLoading(false);
-          }, 0);
-          return;
-        }
-      }
-      
-      // Retry logic for profile loading (in case trigger hasn't completed yet)
-      let retries = 5;
-      let profile = null;
-      let error = null;
-
-      while (retries > 0 && !profile) {
-        // FIXED: Query using user_id instead of id
-        const result = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .single();
-
-        profile = result.data;
-        error = result.error;
-
-        if (error && error.code === 'PGRST116') {
-          // Profile doesn't exist yet
-          console.log('Profile not found, retrying...', retries);
-          
-          // If this is the last retry, try to create the profile manually
-          if (retries === 1) {
-            console.log('Creating profile manually as fallback');
-            try {
-              const { data: newProfile, error: createError } = await supabase
-                .from('profiles')
-                .insert({
-                  user_id: userId,
-                  email: userEmail,
-                  full_name: '',
-                  user_type: 'customer',
-                  role: 'customer',
-                })
-                .select()
-                .single();
-
-              if (!createError && newProfile) {
-                profile = newProfile;
-                error = null;
-                break;
-              } else {
-                console.log('Failed to create profile manually:', createError);
-              }
-            } catch (createErr) {
-              console.log('Exception creating profile:', createErr);
-            }
-          }
-          
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          retries--;
-        } else {
-          break;
-        }
-      }
-
-      if (error && error.code !== 'PGRST116') {
-        console.log('Error loading profile:', error);
-        throw error;
-      }
-
-      if (profile) {
-        console.log('Profile loaded successfully:', {
-          id: profile.id,
-          email: profile.email,
-          user_type: profile.user_type,
-          role: profile.role,
-          full_name: profile.full_name
-        });
-        
-        // FIXED: Map user_type to userType for consistent access in JSX
-        const actualUserType: UserType = profile.user_type || 'customer';
-        
-        console.log('User type from profile:', actualUserType);
-        console.log('Is admin check (user.userType === admin):', actualUserType === 'admin');
-        
-        const userData: User = {
-          id: profile.id,
-          email: profile.email || userEmail,
-          fullName: profile.full_name || '',
-          userType: actualUserType, // Normalized field
-          phone: profile.phone || undefined,
-          createdAt: profile.created_at || new Date().toISOString(),
-          subscriptionPlan: (profile.subscription_plan as SubscriptionPlan) || 'free',
-          businessListingCount: profile.business_listing_count || 0,
-        };
-        
-        console.log('Setting user data with userType:', userData.userType);
-        setUser(userData);
-      } else {
-        console.log('No profile found after retries');
-        // Don't set user to null if we have a session - this prevents the login loop
-        // Instead, create a minimal user object
-        const minimalUser: User = {
-          id: userId,
-          email: userEmail,
-          fullName: '',
-          userType: 'customer',
-          createdAt: new Date().toISOString(),
-          subscriptionPlan: 'free',
-          businessListingCount: 0,
-        };
-        setUser(minimalUser);
-      }
-    } catch (error) {
-      console.log('Error in loadUserProfile:', error);
-      // Don't set user to null - create minimal user to prevent login loop
-      const minimalUser: User = {
-        id: userId,
-        email: userEmail,
-        fullName: '',
-        userType: 'customer',
-        createdAt: new Date().toISOString(),
-        subscriptionPlan: 'free',
-        businessListingCount: 0,
-      };
-      setUser(minimalUser);
-    } finally {
-      if (!forceRefresh) {
-        setIsLoading(false);
-      }
-    }
-  };
 
   const refreshUser = async () => {
     if (session?.user?.id) {
       console.log('=== REFRESH USER CALLED ===');
       console.log('Current user before refresh:', JSON.stringify(user, null, 2));
       setIsLoading(true);
-      await loadUserProfile(session.user.id, session.user.email || '', true);
+      await loadProfile(session.user.id);
+      setIsLoading(false);
       console.log('=== REFRESH USER COMPLETED ===');
     }
   };
@@ -299,36 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     console.log('=== REFRESH PROFILE CALLED ===');
-    
-    // FIXED: Query using user_id instead of id
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .single();
-    
-    if (!error && data) {
-      console.log('Profile data fetched:', data);
-      
-      // FIXED: Map user_type to userType for consistent access in JSX
-      const actualUserType: UserType = data.user_type || 'customer';
-      
-      const userData: User = {
-        id: data.id,
-        email: data.email || session.user.email || '',
-        fullName: data.full_name || '',
-        userType: actualUserType, // Normalized field
-        phone: data.phone || undefined,
-        createdAt: data.created_at || new Date().toISOString(),
-        subscriptionPlan: (data.subscription_plan as SubscriptionPlan) || 'free',
-        businessListingCount: data.business_listing_count || 0,
-      };
-      
-      console.log('Setting user from refreshProfile:', userData);
-      setUser(userData);
-    } else {
-      console.log('Error refreshing profile:', error);
-    }
+    await loadProfile(session.user.id);
   };
 
   const login = async (email: string, password: string) => {
@@ -358,7 +143,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       console.log('Login successful:', data.user?.id);
-      // Profile will be loaded by the auth state change listener
+      
+      // Call loadProfile right after successful login
+      if (data.session?.user?.id) {
+        await loadProfile(data.session.user.id);
+      }
     } catch (error: any) {
       console.log('Login error:', error);
       throw error;
@@ -390,15 +179,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log('Signup successful:', authData.user?.id);
 
+      // Call loadProfile right after successful signup (if session exists)
+      if (authData.session?.user?.id) {
+        await loadProfile(authData.session.user.id);
+      }
+
       // Show email verification message
       Alert.alert(
         'Verify Your Email',
         'We\'ve sent a verification link to your email address. Please check your inbox (and spam folder) and click the link to verify your account before signing in.',
         [{ text: 'OK' }]
       );
-
-      // Don't load the profile yet since email is not verified
-      // The user will need to verify their email and then sign in
     } catch (error: any) {
       console.log('Signup error:', error);
       throw error;
@@ -505,7 +296,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const canAddBusiness = (): boolean => {
     if (!user) return false;
     
-    // FIXED: Admin users can always add businesses (using normalized userType field)
+    // Admin users can always add businesses (using normalized userType field)
     if (user.userType === 'admin') {
       console.log('Admin user - can add business');
       return true;
@@ -523,7 +314,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const getBusinessLimit = (): number => {
     if (!user) return 0;
     
-    // FIXED: Admin users have unlimited businesses (using normalized userType field)
+    // Admin users have unlimited businesses (using normalized userType field)
     if (user.userType === 'admin') {
       console.log('Admin user - unlimited business limit');
       return 999;

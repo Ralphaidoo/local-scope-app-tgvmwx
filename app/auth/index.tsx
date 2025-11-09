@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@react-navigation/native';
 import { router } from 'expo-router';
@@ -10,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function AuthScreen() {
   const theme = useTheme();
-  const { login, signup } = useAuth();
+  const { login, signup, user } = useAuth(); // include user here
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,9 +17,10 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // --- UPDATED HANDLE SUBMIT ---
   const handleSubmit = async () => {
     setError('');
-    
+
     // Validation
     if (!email || !password) {
       setError('Please enter email and password');
@@ -41,30 +41,39 @@ export default function AuthScreen() {
 
     try {
       if (isLogin) {
+        // Log in
         await login(email, password);
-        // Navigate to home on successful login
-        router.replace('/(tabs)/(home)/');
+
+        // Wait briefly to ensure profile loads from context
+        await new Promise((r) => setTimeout(r, 600));
+
+        // Redirect based on role
+        if (user?.userType === 'admin' || user?.user_type === 'admin') {
+          router.replace('/admin');
+        } else {
+          router.replace('/(tabs)/(home)/');
+        }
       } else {
-        // For signup, we'll redirect to onboarding to select user type
+        // Signup → go to onboarding
         router.push({
           pathname: '/onboarding',
-          params: { email, password, fullName }
+          params: { email, password, fullName },
         });
       }
-    } catch (err: any) {
+    } catch (err) {
       console.log('Auth error:', err);
-      // Error is already shown in Alert by the auth context
-      // Only set local error if it wasn't shown
-      if (!err?.message?.includes('Email not confirmed') && 
-          !err?.message?.includes('Invalid login credentials')) {
-        const errorMessage = err?.message || 'Authentication failed. Please try again.';
-        setError(errorMessage);
+      if (
+        !err?.message?.includes('Email not confirmed') &&
+        !err?.message?.includes('Invalid login credentials')
+      ) {
+        setError(err?.message || 'Authentication failed. Please try again.');
       }
     } finally {
       setLoading(false);
     }
   };
 
+  // --- REST OF YOUR COMPONENT ---
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -80,7 +89,7 @@ export default function AuthScreen() {
         <GlassView
           style={[
             styles.formContainer,
-            Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+            Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
           ]}
           glassEffectStyle="regular"
         >
@@ -126,9 +135,7 @@ export default function AuthScreen() {
             />
           </View>
 
-          {error ? (
-            <Text style={styles.errorText}>{error}</Text>
-          ) : null}
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
           <Pressable
             style={[styles.submitButton, loading && styles.submitButtonDisabled]}
@@ -149,7 +156,7 @@ export default function AuthScreen() {
             disabled={loading}
           >
             <Text style={[styles.switchButtonText, { color: theme.colors.primary }]}>
-              {isLogin ? 'Don&apos;t have an account? Sign up' : 'Already have an account? Sign in'}
+              {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
             </Text>
           </Pressable>
         </GlassView>
@@ -165,50 +172,16 @@ export default function AuthScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 32,
-  },
-  header: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-  },
-  formContainer: {
-    padding: 24,
-    borderRadius: 16,
-    marginBottom: 24,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-  },
-  errorText: {
-    color: '#FF3B30',
-    fontSize: 14,
-    marginBottom: 16,
-  },
+  safeArea: { flex: 1 },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 32 },
+  header: { marginBottom: 32 },
+  title: { fontSize: 32, fontWeight: 'bold', marginBottom: 8 },
+  subtitle: { fontSize: 16 },
+  formContainer: { padding: 24, borderRadius: 16, marginBottom: 24 },
+  inputGroup: { marginBottom: 20 },
+  label: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
+  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16 },
+  errorText: { color: '#FF3B30', fontSize: 14, marginBottom: 16 },
   submitButton: {
     backgroundColor: '#007AFF',
     paddingVertical: 16,
@@ -216,29 +189,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  switchButton: {
-    marginTop: 16,
-    alignItems: 'center',
-  },
-  switchButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  footer: {
-    marginTop: 'auto',
-    paddingTop: 24,
-  },
-  footerText: {
-    fontSize: 12,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
+  submitButtonDisabled: { opacity: 0.6 },
+  submitButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  switchButton: { marginTop: 16, alignItems: 'center' },
+  switchButtonText: { fontSize: 14, fontWeight: '500' },
+  footer: { marginTop: 'auto', paddingTop: 24 },
+  footerText: { fontSize: 12, textAlign: 'center', lineHeight: 18 },
 });
