@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Initial session:', session?.user?.id);
       setSession(session);
       if (session?.user) {
-        loadUserProfile(session.user.id);
+        loadUserProfile(session.user.id, session.user.email || '');
       } else {
         setIsLoading(false);
       }
@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (_event === 'SIGNED_IN' || _event === 'USER_UPDATED') {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
-        await loadUserProfile(session.user.id);
+        await loadUserProfile(session.user.id, session.user.email || '');
       } else {
         setUser(null);
         setIsLoading(false);
@@ -64,12 +64,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const loadUserProfile = async (userId: string) => {
+  const loadUserProfile = async (userId: string, userEmail: string) => {
     try {
       console.log('Loading user profile for:', userId);
       
       // Retry logic for profile loading (in case trigger hasn't completed yet)
-      let retries = 3;
+      let retries = 5;
       let profile = null;
       let error = null;
 
@@ -84,8 +84,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error = result.error;
 
         if (error && error.code === 'PGRST116') {
-          // Profile doesn't exist yet, wait and retry
+          // Profile doesn't exist yet
           console.log('Profile not found, retrying...', retries);
+          
+          // If this is the last retry, try to create the profile manually
+          if (retries === 1) {
+            console.log('Creating profile manually as fallback');
+            try {
+              const { data: newProfile, error: createError } = await supabase
+                .from('profiles')
+                .insert({
+                  user_id: userId,
+                  email: userEmail,
+                  full_name: '',
+                  user_type: 'customer',
+                })
+                .select()
+                .single();
+
+              if (!createError && newProfile) {
+                profile = newProfile;
+                error = null;
+                break;
+              } else {
+                console.log('Failed to create profile manually:', createError);
+              }
+            } catch (createErr) {
+              console.log('Exception creating profile:', createErr);
+            }
+          }
+          
           await new Promise(resolve => setTimeout(resolve, 1000));
           retries--;
         } else {
@@ -102,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('Profile loaded:', profile);
         const userData: User = {
           id: profile.id,
-          email: profile.email || '',
+          email: profile.email || userEmail,
           fullName: profile.full_name || '',
           userType: (profile.user_type as UserType) || 'customer',
           phone: profile.phone || undefined,
@@ -113,11 +141,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(userData);
       } else {
         console.log('No profile found after retries');
-        setUser(null);
+        // Don't set user to null if we have a session - this prevents the login loop
+        // Instead, create a minimal user object
+        const minimalUser: User = {
+          id: userId,
+          email: userEmail,
+          fullName: '',
+          userType: 'customer',
+          createdAt: new Date().toISOString(),
+          subscriptionPlan: 'free',
+          businessListingCount: 0,
+        };
+        setUser(minimalUser);
       }
     } catch (error) {
       console.log('Error in loadUserProfile:', error);
-      setUser(null);
+      // Don't set user to null - create minimal user to prevent login loop
+      const minimalUser: User = {
+        id: userId,
+        email: userEmail,
+        fullName: '',
+        userType: 'customer',
+        createdAt: new Date().toISOString(),
+        subscriptionPlan: 'free',
+        businessListingCount: 0,
+      };
+      setUser(minimalUser);
     } finally {
       setIsLoading(false);
     }
@@ -126,7 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = async () => {
     if (session?.user?.id) {
       setIsLoading(true);
-      await loadUserProfile(session.user.id);
+      await loadUserProfile(session.user.id, session.user.email || '');
     }
   };
 

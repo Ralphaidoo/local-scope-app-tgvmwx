@@ -49,10 +49,14 @@ function RootLayoutNav() {
     });
 
     // Only redirect if we have a clear auth state
-    if (!isAuthenticated && !inAuthGroup) {
-      // User is not authenticated and not in auth flow - redirect to auth
-      console.log('Redirecting to auth - user not authenticated');
+    if (!session && !inAuthGroup) {
+      // No session and not in auth flow - redirect to auth
+      console.log('Redirecting to auth - no session');
       router.replace('/auth');
+    } else if (session && !user && !inAuthGroup) {
+      // Has session but no user yet (still loading profile) - wait
+      console.log('Waiting for profile to load');
+      return;
     } else if (isAuthenticated && inAuthGroup) {
       // User is authenticated and in auth flow - redirect to home
       console.log('Redirecting to home - user authenticated');
