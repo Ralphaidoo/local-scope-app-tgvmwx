@@ -1,153 +1,165 @@
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@react-navigation/native';
-import { router, useLocalSearchParams } from 'expo-router';
-import { GlassView } from 'expo-glass-effect';
+import { router } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
+import { GlassView } from 'expo-glass-effect';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserType } from '@/types';
 
 export default function OnboardingScreen() {
   const theme = useTheme();
-  const { signup } = useAuth();
-  const params = useLocalSearchParams();
+  const { user, updateProfile } = useAuth();
   const [selectedType, setSelectedType] = useState<UserType | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const email = params.email as string;
-  const password = params.password as string;
-  const fullName = params.fullName as string;
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleContinue = async () => {
     if (!selectedType) {
-      setError('Please select an account type');
+      Alert.alert('Selection Required', 'Please select your account type to continue.');
       return;
     }
 
-    setError('');
-    setLoading(true);
-
     try {
-      await signup(email, password, fullName, selectedType);
-      // After successful signup, redirect to auth screen to sign in
-      // The signup function will show an alert about email verification
-      router.replace('/auth');
-    } catch (err: any) {
-      console.log('Signup error:', err);
-      // Error is already shown in Alert by the auth context
-      setError(err?.message || 'Failed to create account. Please try again.');
+      setIsLoading(true);
+      
+      // Update the user profile with the selected type
+      await updateProfile({
+        userType: selectedType,
+      });
+
+      // Mark onboarding as complete
+      console.log('Onboarding complete, user type:', selectedType);
+      
+      // Navigate based on user type
+      if (selectedType === 'admin') {
+        router.replace('/(tabs)/admin');
+      } else if (selectedType === 'business_user') {
+        router.replace('/(tabs)/dashboard');
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      Alert.alert('Error', 'Failed to complete onboarding. Please try again.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
+  const userTypes: Array<{
+    type: UserType;
+    title: string;
+    description: string;
+    icon: string;
+    color: string;
+  }> = [
+    {
+      type: 'customer',
+      title: 'Customer',
+      description: 'Discover and connect with local businesses, book services, and shop products.',
+      icon: 'person.fill',
+      color: '#007AFF',
+    },
+    {
+      type: 'business_user',
+      title: 'Business Owner',
+      description: 'List your business, manage bookings, sell products, and grow your local presence.',
+      icon: 'building.2.fill',
+      color: '#34C759',
+    },
+    {
+      type: 'admin',
+      title: 'Administrator',
+      description: 'Manage the platform, moderate content, and oversee all users and businesses.',
+      icon: 'shield.fill',
+      color: '#FF3B30',
+    },
+  ];
+
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top', 'bottom']}>
+      <View style={styles.container}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.colors.text }]}>
-            Choose Your Account Type
+            Welcome to Local Scope
           </Text>
           <Text style={[styles.subtitle, { color: theme.dark ? '#98989D' : '#666' }]}>
-            Select how you&apos;ll be using Local Scope
+            Choose your account type to get started
           </Text>
         </View>
 
         <View style={styles.optionsContainer}>
-          <Pressable
-            style={[
-              styles.optionCard,
-              selectedType === 'customer' && styles.optionCardSelected,
-            ]}
-            onPress={() => setSelectedType('customer')}
-            disabled={loading}
-          >
-            <GlassView
-              style={[
-                styles.optionContent,
-                Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+          {userTypes.map((userType) => (
+            <Pressable
+              key={userType.type}
+              onPress={() => setSelectedType(userType.type)}
+              style={({ pressed }) => [
+                { opacity: pressed ? 0.7 : 1 }
               ]}
-              glassEffectStyle="regular"
             >
-              <View style={[styles.iconContainer, { backgroundColor: '#007AFF' }]}>
-                <IconSymbol name="person.fill" size={32} color="#fff" />
-              </View>
-              <Text style={[styles.optionTitle, { color: theme.colors.text }]}>
-                Customer
-              </Text>
-              <Text style={[styles.optionDescription, { color: theme.dark ? '#98989D' : '#666' }]}>
-                Discover and connect with local businesses
-              </Text>
-              {selectedType === 'customer' && (
-                <View style={styles.checkmark}>
-                  <IconSymbol name="checkmark.circle.fill" size={24} color="#007AFF" />
+              <GlassView
+                style={[
+                  styles.optionCard,
+                  selectedType === userType.type && styles.optionCardSelected,
+                  Platform.OS !== 'ios' && {
+                    backgroundColor: selectedType === userType.type
+                      ? theme.dark ? 'rgba(0,122,255,0.2)' : 'rgba(0,122,255,0.1)'
+                      : theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
+                  }
+                ]}
+                glassEffectStyle="regular"
+              >
+                <View style={[styles.iconContainer, { backgroundColor: userType.color }]}>
+                  <IconSymbol name={userType.icon} color="#fff" size={32} />
                 </View>
-              )}
-            </GlassView>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.optionCard,
-              selectedType === 'business_user' && styles.optionCardSelected,
-            ]}
-            onPress={() => setSelectedType('business_user')}
-            disabled={loading}
-          >
-            <GlassView
-              style={[
-                styles.optionContent,
-                Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
-              ]}
-              glassEffectStyle="regular"
-            >
-              <View style={[styles.iconContainer, { backgroundColor: '#34C759' }]}>
-                <IconSymbol name="briefcase.fill" size={32} color="#fff" />
-              </View>
-              <Text style={[styles.optionTitle, { color: theme.colors.text }]}>
-                Business Owner
-              </Text>
-              <Text style={[styles.optionDescription, { color: theme.dark ? '#98989D' : '#666' }]}>
-                List and manage your business
-              </Text>
-              {selectedType === 'business_user' && (
-                <View style={styles.checkmark}>
-                  <IconSymbol name="checkmark.circle.fill" size={24} color="#34C759" />
+                <View style={styles.optionContent}>
+                  <Text style={[styles.optionTitle, { color: theme.colors.text }]}>
+                    {userType.title}
+                  </Text>
+                  <Text style={[styles.optionDescription, { color: theme.dark ? '#98989D' : '#666' }]}>
+                    {userType.description}
+                  </Text>
                 </View>
-              )}
-            </GlassView>
-          </Pressable>
+                {selectedType === userType.type && (
+                  <View style={styles.checkmark}>
+                    <IconSymbol name="checkmark.circle.fill" color="#007AFF" size={28} />
+                  </View>
+                )}
+              </GlassView>
+            </Pressable>
+          ))}
         </View>
 
-        {error ? (
-          <Text style={styles.errorText}>{error}</Text>
-        ) : null}
+        <View style={styles.footer}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.continueButton,
+              {
+                backgroundColor: selectedType ? '#007AFF' : theme.dark ? '#333' : '#ddd',
+                opacity: pressed ? 0.7 : 1,
+              }
+            ]}
+            onPress={handleContinue}
+            disabled={!selectedType || isLoading}
+          >
+            <Text style={[
+              styles.continueButtonText,
+              { color: selectedType ? '#fff' : theme.dark ? '#666' : '#999' }
+            ]}>
+              {isLoading ? 'Setting up...' : 'Continue'}
+            </Text>
+            {!isLoading && selectedType && (
+              <IconSymbol name="arrow.right" color="#fff" size={20} />
+            )}
+          </Pressable>
 
-        <Pressable
-          style={[styles.continueButton, (!selectedType || loading) && styles.continueButtonDisabled]}
-          onPress={handleContinue}
-          disabled={!selectedType || loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.continueButtonText}>Create Account</Text>
-          )}
-        </Pressable>
-
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-          disabled={loading}
-        >
-          <Text style={[styles.backButtonText, { color: theme.colors.primary }]}>
-            Go Back
+          <Text style={[styles.footerNote, { color: theme.dark ? '#666' : '#999' }]}>
+            You can change your account type later in settings
           </Text>
-        </Pressable>
-      </ScrollView>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -156,87 +168,78 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 32,
+  container: {
+    flex: 1,
+    padding: 24,
   },
   header: {
     marginBottom: 32,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
+    lineHeight: 24,
   },
   optionsContainer: {
+    flex: 1,
     gap: 16,
-    marginBottom: 24,
   },
   optionCard: {
+    padding: 20,
     borderRadius: 16,
-    overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   optionCardSelected: {
-    transform: [{ scale: 0.98 }],
-  },
-  optionContent: {
-    padding: 24,
-    alignItems: 'center',
-    position: 'relative',
+    borderColor: '#007AFF',
   },
   iconContainer: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    alignItems: 'center',
+  },
+  optionContent: {
+    flex: 1,
   },
   optionTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontWeight: '600',
+    marginBottom: 4,
   },
   optionDescription: {
     fontSize: 14,
-    textAlign: 'center',
+    lineHeight: 20,
   },
   checkmark: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
+    marginLeft: 8,
   },
-  errorText: {
-    color: '#FF3B30',
-    fontSize: 14,
-    marginBottom: 16,
-    textAlign: 'center',
+  footer: {
+    gap: 16,
+    paddingTop: 24,
   },
   continueButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 16,
-    borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  continueButtonDisabled: {
-    opacity: 0.6,
+    justifyContent: 'center',
+    gap: 8,
+    padding: 16,
+    borderRadius: 12,
   },
   continueButtonText: {
-    color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
   },
-  backButton: {
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  backButtonText: {
+  footerNote: {
     fontSize: 14,
-    fontWeight: '500',
+    textAlign: 'center',
   },
 });

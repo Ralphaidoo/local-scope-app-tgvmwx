@@ -19,6 +19,8 @@ export default function ProfileScreen() {
     console.log('User:', JSON.stringify(user, null, 2));
     console.log('User Type:', user?.userType);
     console.log('Is Admin:', user?.userType === 'admin');
+    console.log('Is Business User:', user?.userType === 'business_user');
+    console.log('Is Customer:', user?.userType === 'customer');
     console.log('================================');
   }, [user]);
 
@@ -126,15 +128,22 @@ export default function ProfileScreen() {
   const subscriptionPlan = user?.subscriptionPlan || 'free';
   const isAdmin = user?.userType === 'admin';
   const isBusinessUser = user?.userType === 'business_user';
+  const isCustomer = user?.userType === 'customer';
 
-  console.log('Profile Screen Render - User Type:', user?.userType, 'Is Admin:', isAdmin);
+  console.log('Profile Screen Render - User Type:', user?.userType, 'Is Admin:', isAdmin, 'Is Business:', isBusinessUser, 'Is Customer:', isCustomer);
 
-  // Determine the display text for user type
+  // Determine the display text and styling for user type
   const getUserTypeDisplay = () => {
-    if (user.userType === 'admin') return 'Admin';
-    if (user.userType === 'business_user') return 'Business Owner';
-    return 'Customer';
+    if (user.userType === 'admin') {
+      return { label: 'Administrator', color: '#FF3B30', icon: 'shield.fill' };
+    }
+    if (user.userType === 'business_user') {
+      return { label: 'Business Owner', color: '#34C759', icon: 'building.2.fill' };
+    }
+    return { label: 'Customer', color: '#007AFF', icon: 'person.fill' };
   };
+
+  const userTypeInfo = getUserTypeDisplay();
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
@@ -172,8 +181,8 @@ export default function ProfileScreen() {
           glassEffectStyle="regular"
         >
           <View style={styles.avatarContainer}>
-            <View style={[styles.avatar, { backgroundColor: theme.dark ? '#333' : '#ddd' }]}>
-              <IconSymbol name="person.fill" color={theme.colors.text} size={40} />
+            <View style={[styles.avatar, { backgroundColor: userTypeInfo.color }]}>
+              <IconSymbol name={userTypeInfo.icon} color="#fff" size={40} />
             </View>
           </View>
           <Text style={[styles.userName, { color: theme.colors.text }]}>
@@ -184,10 +193,11 @@ export default function ProfileScreen() {
           </Text>
           <View style={[
             styles.userTypeBadge,
-            { backgroundColor: isAdmin ? 'rgba(255, 59, 48, 0.2)' : 'rgba(0, 122, 255, 0.2)' }
+            { backgroundColor: `${userTypeInfo.color}33` }
           ]}>
-            <Text style={[styles.userTypeText, { color: theme.colors.text }]}>
-              {getUserTypeDisplay()}
+            <IconSymbol name={userTypeInfo.icon} color={userTypeInfo.color} size={16} />
+            <Text style={[styles.userTypeText, { color: userTypeInfo.color }]}>
+              {userTypeInfo.label}
             </Text>
           </View>
           
@@ -212,8 +222,8 @@ export default function ProfileScreen() {
               glassEffectStyle="regular"
             >
               <View style={styles.adminPortalContent}>
-                <View style={[styles.adminPortalIcon, { backgroundColor: '#FF9500' }]}>
-                  <IconSymbol name="gear" color="#fff" size={24} />
+                <View style={[styles.adminPortalIcon, { backgroundColor: '#FF3B30' }]}>
+                  <IconSymbol name="shield.fill" color="#fff" size={24} />
                 </View>
                 <View style={styles.adminPortalText}>
                   <Text style={[styles.adminPortalTitle, { color: theme.colors.text }]}>
@@ -221,6 +231,34 @@ export default function ProfileScreen() {
                   </Text>
                   <Text style={[styles.adminPortalSubtitle, { color: theme.dark ? '#98989D' : '#666' }]}>
                     Manage users, businesses, and platform settings
+                  </Text>
+                </View>
+              </View>
+              <IconSymbol name="chevron.right" color={theme.dark ? '#98989D' : '#666'} size={20} />
+            </GlassView>
+          </Pressable>
+        )}
+
+        {/* Business Dashboard Link (for business users and admins) */}
+        {(isBusinessUser || isAdmin) && (
+          <Pressable onPress={() => router.push('/(tabs)/dashboard')}>
+            <GlassView
+              style={[
+                styles.dashboardCard,
+                Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+              ]}
+              glassEffectStyle="regular"
+            >
+              <View style={styles.dashboardContent}>
+                <View style={[styles.dashboardIcon, { backgroundColor: '#34C759' }]}>
+                  <IconSymbol name="chart.bar.fill" color="#fff" size={24} />
+                </View>
+                <View style={styles.dashboardText}>
+                  <Text style={[styles.dashboardTitle, { color: theme.colors.text }]}>
+                    Business Dashboard
+                  </Text>
+                  <Text style={[styles.dashboardSubtitle, { color: theme.dark ? '#98989D' : '#666' }]}>
+                    Manage your businesses, orders, and bookings
                   </Text>
                 </View>
               </View>
@@ -321,8 +359,8 @@ export default function ProfileScreen() {
             )}
 
             {isAdmin && (
-              <View style={[styles.upgradePrompt, { backgroundColor: 'rgba(255, 149, 0, 0.1)' }]}>
-                <IconSymbol name="checkmark.shield.fill" color="#FF9500" size={24} />
+              <View style={[styles.upgradePrompt, { backgroundColor: 'rgba(255, 59, 48, 0.1)' }]}>
+                <IconSymbol name="checkmark.shield.fill" color="#FF3B30" size={24} />
                 <Text style={[styles.upgradePromptText, { color: theme.colors.text }]}>
                   As an admin, you have full access to all business features including unlimited listings, bookings, and sales.
                 </Text>
@@ -369,7 +407,7 @@ export default function ProfileScreen() {
             </GlassView>
           </Pressable>
 
-          {user.userType === 'customer' && (
+          {isCustomer && (
             <Pressable onPress={() => router.push('/bookings')}>
               <GlassView
                 style={[
@@ -435,6 +473,12 @@ export default function ProfileScreen() {
             </Text>
             <Text style={[styles.debugText, { color: theme.dark ? '#98989D' : '#666' }]}>
               Is Admin: {isAdmin ? 'Yes' : 'No'}
+            </Text>
+            <Text style={[styles.debugText, { color: theme.dark ? '#98989D' : '#666' }]}>
+              Is Business User: {isBusinessUser ? 'Yes' : 'No'}
+            </Text>
+            <Text style={[styles.debugText, { color: theme.dark ? '#98989D' : '#666' }]}>
+              Is Customer: {isCustomer ? 'Yes' : 'No'}
             </Text>
             <Text style={[styles.debugText, { color: theme.dark ? '#98989D' : '#666' }]}>
               Email: {user.email}
@@ -545,13 +589,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   userTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
     marginBottom: 16,
   },
   userTypeText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
   },
   editProfileButton: {
@@ -598,6 +645,39 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   adminPortalSubtitle: {
+    fontSize: 12,
+  },
+  dashboardCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dashboardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  dashboardIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dashboardText: {
+    flex: 1,
+  },
+  dashboardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  dashboardSubtitle: {
     fontSize: 12,
   },
   addBusinessCard: {

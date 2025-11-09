@@ -94,18 +94,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             full_name: profile.full_name
           });
           
-          // Determine the actual user type - prioritize 'role' field over 'user_type'
-          // This ensures admin status is properly recognized
-          let actualUserType: UserType = 'customer';
-          if (profile.role === 'admin' || profile.user_type === 'admin') {
-            actualUserType = 'admin';
-          } else if (profile.role === 'business_user' || profile.user_type === 'business_user') {
-            actualUserType = 'business_user';
-          } else {
-            actualUserType = 'customer';
-          }
+          // Both role and user_type should now be in sync thanks to the trigger
+          // Use user_type as the primary source
+          const actualUserType: UserType = profile.user_type || 'customer';
           
-          console.log('Determined user type:', actualUserType, 'from role:', profile.role, 'and user_type:', profile.user_type);
+          console.log('User type from profile:', actualUserType);
           
           const userData: User = {
             id: profile.id,
@@ -196,18 +189,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           full_name: profile.full_name
         });
         
-        // Determine the actual user type - prioritize 'role' field over 'user_type'
-        // This ensures admin status is properly recognized
-        let actualUserType: UserType = 'customer';
-        if (profile.role === 'admin' || profile.user_type === 'admin') {
-          actualUserType = 'admin';
-        } else if (profile.role === 'business_user' || profile.user_type === 'business_user') {
-          actualUserType = 'business_user';
-        } else {
-          actualUserType = 'customer';
-        }
+        // Both role and user_type should now be in sync thanks to the trigger
+        // Use user_type as the primary source
+        const actualUserType: UserType = profile.user_type || 'customer';
         
-        console.log('Determined user type:', actualUserType, 'from role:', profile.role, 'and user_type:', profile.user_type);
+        console.log('User type from profile:', actualUserType);
         
         const userData: User = {
           id: profile.id,
@@ -377,8 +363,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (updates.fullName !== undefined) profileUpdates.full_name = updates.fullName;
       if (updates.phone !== undefined) profileUpdates.phone = updates.phone;
       if (updates.userType !== undefined) {
+        // Update both user_type and role to keep them in sync
         profileUpdates.user_type = updates.userType;
-        profileUpdates.role = updates.userType; // Keep both fields in sync
+        profileUpdates.role = updates.userType;
       }
       if (updates.subscriptionPlan !== undefined) profileUpdates.subscription_plan = updates.subscriptionPlan;
       if (updates.businessListingCount !== undefined) profileUpdates.business_listing_count = updates.businessListingCount;
