@@ -98,6 +98,15 @@ export default function ProfileScreen() {
               {user?.userType === 'customer' ? 'Customer' : user?.userType === 'business_user' ? 'Business Owner' : 'Admin'}
             </Text>
           </View>
+          
+          {/* Edit Profile Button */}
+          <Pressable
+            style={[styles.editProfileButton, { backgroundColor: '#007AFF' }]}
+            onPress={() => router.push('/profile/edit')}
+          >
+            <IconSymbol name="pencil" color="#fff" size={16} />
+            <Text style={styles.editProfileButtonText}>Edit Profile</Text>
+          </Pressable>
         </GlassView>
 
         {/* Admin Portal Link (for admin users) */}
@@ -388,9 +397,23 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
     backgroundColor: 'rgba(0, 122, 255, 0.2)',
+    marginBottom: 16,
   },
   userTypeText: {
     fontSize: 12,
+    fontWeight: '600',
+  },
+  editProfileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  editProfileButtonText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '600',
   },
   adminPortalCard: {
