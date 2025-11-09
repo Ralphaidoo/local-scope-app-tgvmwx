@@ -64,12 +64,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const loadUserProfile = async (userId: string, userEmail: string) => {
+  const loadUserProfile = async (userId: string, userEmail: string, forceRefresh: boolean = false) => {
     try {
-      console.log('Loading user profile for:', userId);
+      console.log('Loading user profile for:', userId, 'Force refresh:', forceRefresh);
       
       // Retry logic for profile loading (in case trigger hasn't completed yet)
-      let retries = 5;
+      let retries = forceRefresh ? 1 : 5;
       let profile = null;
       let error = null;
 
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('Profile not found, retrying...', retries);
           
           // If this is the last retry, try to create the profile manually
-          if (retries === 1) {
+          if (retries === 1 && !forceRefresh) {
             console.log('Creating profile manually as fallback');
             try {
               const { data: newProfile, error: createError } = await supabase
@@ -114,7 +114,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
           
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          if (!forceRefresh) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
           retries--;
         } else {
           break;
@@ -127,7 +129,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (profile) {
-        console.log('Profile loaded:', profile);
+        console.log('Profile loaded successfully:', {
+          id: profile.id,
+          email: profile.email,
+          user_type: profile.user_type,
+          full_name: profile.full_name
+        });
+        
         const userData: User = {
           id: profile.id,
           email: profile.email || userEmail,
@@ -138,6 +146,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           subscriptionPlan: (profile.subscription_plan as SubscriptionPlan) || 'free',
           businessListingCount: profile.business_listing_count || 0,
         };
+        
+        console.log('Setting user data with userType:', userData.userType);
         setUser(userData);
       } else {
         console.log('No profile found after retries');
@@ -174,8 +184,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = async () => {
     if (session?.user?.id) {
+      console.log('Refreshing user data...');
       setIsLoading(true);
-      await loadUserProfile(session.user.id, session.user.email || '');
+      await loadUserProfile(session.user.id, session.user.email || '', true);
     }
   };
 

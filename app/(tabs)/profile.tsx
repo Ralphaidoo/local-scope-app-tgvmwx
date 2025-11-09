@@ -10,7 +10,8 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function ProfileScreen() {
   const theme = useTheme();
-  const { user, logout, getBusinessLimit, canAddBusiness, isLoading } = useAuth();
+  const { user, logout, getBusinessLimit, canAddBusiness, isLoading, refreshUser } = useAuth();
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
 
   const handleLogout = () => {
     Alert.alert(
@@ -33,6 +34,19 @@ export default function ProfileScreen() {
         },
       ]
     );
+  };
+
+  const handleRefreshProfile = async () => {
+    try {
+      setIsRefreshing(true);
+      await refreshUser();
+      Alert.alert('Success', 'Profile refreshed successfully!');
+    } catch (error) {
+      console.log('Refresh error:', error);
+      Alert.alert('Error', 'Failed to refresh profile. Please try again.');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleAddBusiness = () => {
@@ -101,10 +115,26 @@ export default function ProfileScreen() {
   const isAdmin = user?.userType === 'admin';
   const isBusinessUser = user?.userType === 'business_user';
 
+  console.log('Profile Screen - User Type:', user?.userType, 'Is Admin:', isAdmin);
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Profile</Text>
+        <Pressable
+          style={({ pressed }) => [
+            styles.refreshButton,
+            { opacity: pressed ? 0.5 : 1 }
+          ]}
+          onPress={handleRefreshProfile}
+          disabled={isRefreshing}
+        >
+          {isRefreshing ? (
+            <ActivityIndicator size="small" color="#007AFF" />
+          ) : (
+            <IconSymbol name="arrow.clockwise" color="#007AFF" size={24} />
+          )}
+        </Pressable>
       </View>
 
       <ScrollView
@@ -395,10 +425,16 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
     paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
+  },
+  refreshButton: {
+    padding: 8,
   },
   loadingContainer: {
     flex: 1,
