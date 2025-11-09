@@ -7,6 +7,7 @@ import { Alert } from 'react-native';
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -28,7 +29,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.log('Error getting initial session:', error);
+      }
       console.log('Initial session:', session?.user?.id);
       setSession(session);
       if (session) {
@@ -207,9 +211,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updateProfile = async (updates: Partial<User>) => {
     try {
-      if (!user || !session?.user?.id) return;
+      // Verify we have an active session
+      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
       
-      console.log('Updating profile:', updates);
+      if (sessionError) {
+        console.log('Session error in updateProfile:', sessionError);
+        throw new Error('Failed to verify session. Please try logging in again.');
+      }
+
+      if (!currentSession) {
+        console.log('No active session in updateProfile');
+        throw new Error('Your session has expired. Please log in again.');
+      }
+
+      if (!user) {
+        throw new Error('No user data available');
+      }
+      
+      console.log('Updating profile for user:', currentSession.user.id, updates);
       
       const profileUpdates: any = {};
       if (updates.fullName !== undefined) profileUpdates.full_name = updates.fullName;
@@ -221,7 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { error } = await supabase
         .from('profiles')
         .update(profileUpdates)
-        .eq('user_id', session.user.id);
+        .eq('user_id', currentSession.user.id);
 
       if (error) {
         console.log('Update profile error:', error);
@@ -230,7 +249,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const updatedUser = { ...user, ...updates };
       setUser(updatedUser);
-    } catch (error) {
+      console.log('Profile updated successfully');
+    } catch (error: any) {
       console.log('Update profile error:', error);
       throw error;
     }
@@ -238,14 +258,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const upgradeSubscription = async (plan: SubscriptionPlan) => {
     try {
-      if (!user || !session?.user?.id) return;
+      // Verify we have an active session
+      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !currentSession) {
+        throw new Error('Session expired. Please log in again.');
+      }
+
+      if (!user) {
+        throw new Error('No user data available');
+      }
       
       console.log('Upgrading subscription to:', plan);
       
       const { error } = await supabase
         .from('profiles')
         .update({ subscription_plan: plan })
-        .eq('user_id', session.user.id);
+        .eq('user_id', currentSession.user.id);
 
       if (error) {
         console.log('Upgrade subscription error:', error);
@@ -292,6 +321,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        session,
         isAuthenticated: !!user && !!session,
         isLoading,
         login,

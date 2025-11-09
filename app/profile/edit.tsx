@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Platform, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@react-navigation/native';
@@ -17,6 +17,15 @@ export default function EditProfileScreen() {
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Update form when user data changes
+  useEffect(() => {
+    if (user) {
+      setFullName(user.fullName || '');
+      setEmail(user.email || '');
+      setPhone(user.phone || '');
+    }
+  }, [user]);
 
   const handleSave = async () => {
     console.log('Save button pressed');
@@ -40,13 +49,35 @@ export default function EditProfileScreen() {
 
     setIsLoading(true);
     try {
+      // First, verify we have an active session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.log('Session error:', sessionError);
+        Alert.alert('Error', 'Failed to verify your session. Please try logging in again.');
+        setIsLoading(false);
+        return;
+      }
+
+      if (!session) {
+        console.log('No active session found');
+        Alert.alert('Session Expired', 'Your session has expired. Please log in again.');
+        setIsLoading(false);
+        // Optionally redirect to login
+        // router.replace('/auth');
+        return;
+      }
+
+      console.log('Active session found for user:', session.user.id);
+
       // Check if email has changed
       const emailChanged = email.trim() !== user?.email;
       
       if (emailChanged) {
         console.log('Email changed, updating through Supabase Auth');
+        
         // Update email through Supabase Auth
-        const { error: emailError } = await supabase.auth.updateUser({
+        const { data: updateData, error: emailError } = await supabase.auth.updateUser({
           email: email.trim(),
         });
 
@@ -57,6 +88,8 @@ export default function EditProfileScreen() {
           return;
         }
 
+        console.log('Email update initiated:', updateData);
+
         // Show confirmation message about email verification
         Alert.alert(
           'Email Update Initiated',
@@ -65,7 +98,7 @@ export default function EditProfileScreen() {
         );
       }
 
-      // Update profile information
+      // Update profile information in the profiles table
       console.log('Updating profile information');
       await updateProfile({
         fullName: fullName.trim(),
