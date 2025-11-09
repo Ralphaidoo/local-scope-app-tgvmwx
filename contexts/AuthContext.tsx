@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       console.log('Initial session:', session?.user?.id);
       setSession(session);
-      if (session) {
+      if (session?.user) {
         loadUserProfile(session.user.id);
       } else {
         setIsLoading(false);
@@ -45,11 +45,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log('Auth state changed:', _event, session?.user?.id);
       setSession(session);
-      if (session) {
-        loadUserProfile(session.user.id);
+      
+      if (session?.user) {
+        // For email confirmation events, wait a bit for the profile to be created
+        if (_event === 'SIGNED_IN' || _event === 'USER_UPDATED') {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        await loadUserProfile(session.user.id);
       } else {
         setUser(null);
         setIsLoading(false);
@@ -62,23 +67,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadUserProfile = async (userId: string) => {
     try {
       console.log('Loading user profile for:', userId);
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
+      
+      // Retry logic for profile loading (in case trigger hasn't completed yet)
+      let retries = 3;
+      let profile = null;
+      let error = null;
 
-      if (error) {
-        console.log('Error loading profile:', error);
-        
-        // If profile doesn't exist, this might be a new user
-        if (error.code === 'PGRST116') {
-          console.log('Profile not found for user, might be a new signup');
-          setUser(null);
-          setIsLoading(false);
-          return;
+      while (retries > 0 && !profile) {
+        const result = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        profile = result.data;
+        error = result.error;
+
+        if (error && error.code === 'PGRST116') {
+          // Profile doesn't exist yet, wait and retry
+          console.log('Profile not found, retrying...', retries);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          retries--;
+        } else {
+          break;
         }
-        
+      }
+
+      if (error && error.code !== 'PGRST116') {
+        console.log('Error loading profile:', error);
         throw error;
       }
 
@@ -96,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
         setUser(userData);
       } else {
-        console.log('No profile data returned');
+        console.log('No profile found after retries');
         setUser(null);
       }
     } catch (error) {
@@ -141,9 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       console.log('Login successful:', data.user?.id);
-      if (data.user) {
-        await loadUserProfile(data.user.id);
-      }
+      // Profile will be loaded by the auth state change listener
     } catch (error: any) {
       console.log('Login error:', error);
       throw error;
@@ -175,37 +189,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log('Signup successful:', authData.user?.id);
 
-      // Update the profile with the user type since the trigger might not have set it
-      if (authData.user) {
-        // Wait a moment for the trigger to complete
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({
-            full_name: fullName,
-            user_type: userType,
-            subscription_plan: 'free',
-            business_listing_count: 0,
-            has_completed_onboarding: false,
-          })
-          .eq('user_id', authData.user.id);
+      // Show email verification message
+      Alert.alert(
+        'Verify Your Email',
+        'We\'ve sent a verification link to your email address. Please check your inbox (and spam folder) and click the link to verify your account before signing in.',
+        [{ text: 'OK' }]
+      );
 
-        if (updateError) {
-          console.log('Profile update error:', updateError);
-          // Don't throw here, the profile was created by the trigger
-        }
-
-        // Show email verification message
-        Alert.alert(
-          'Verify Your Email',
-          'We\'ve sent a verification link to your email address. Please check your inbox (and spam folder) and click the link to verify your account before signing in.',
-          [{ text: 'OK' }]
-        );
-
-        // Don't load the profile yet since email is not verified
-        // await loadUserProfile(authData.user.id);
-      }
+      // Don't load the profile yet since email is not verified
+      // The user will need to verify their email and then sign in
     } catch (error: any) {
       console.log('Signup error:', error);
       throw error;

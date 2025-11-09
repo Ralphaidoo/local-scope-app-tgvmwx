@@ -3,14 +3,13 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@react-navigation/native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { GlassView } from 'expo-glass-effect';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 
 export default function EmailConfirmedScreen() {
   const theme = useTheme();
-  const params = useLocalSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Verifying your email...');
 
@@ -20,10 +19,10 @@ export default function EmailConfirmedScreen() {
 
   const handleEmailConfirmation = async () => {
     try {
-      console.log('Email confirmation params:', params);
+      console.log('Email confirmation screen loaded');
       
       // Wait a moment for the auth state to update
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Get the current session to check if email is verified
       const { data: { session }, error } = await supabase.auth.getSession();
@@ -35,18 +34,21 @@ export default function EmailConfirmedScreen() {
         return;
       }
 
-      if (session) {
+      if (session?.user) {
         console.log('Email confirmed successfully, user has active session');
         setStatus('success');
-        setMessage('Email verified successfully! Redirecting to your dashboard...');
+        setMessage('Email verified successfully! You can now sign in to your account.');
+        
+        // Sign out the user so they can sign in properly
+        await supabase.auth.signOut();
         
         // Wait a moment before redirecting
         setTimeout(() => {
-          router.replace('/(tabs)/(home)/');
+          router.replace('/auth');
         }, 2000);
       } else {
-        // No session yet, email was verified but user needs to sign in
-        console.log('Email verified but no active session');
+        // No session, email was verified but user needs to sign in
+        console.log('Email verified, redirecting to sign in');
         setStatus('success');
         setMessage('Email verified! Please sign in to continue.');
         
@@ -62,18 +64,7 @@ export default function EmailConfirmedScreen() {
   };
 
   const handleContinue = () => {
-    if (status === 'success') {
-      // Check if we have a session
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-          router.replace('/(tabs)/(home)/');
-        } else {
-          router.replace('/auth');
-        }
-      });
-    } else {
-      router.replace('/auth');
-    }
+    router.replace('/auth');
   };
 
   return (
@@ -116,7 +107,7 @@ export default function EmailConfirmedScreen() {
                 ]}
                 onPress={handleContinue}
               >
-                <Text style={styles.buttonText}>Continue</Text>
+                <Text style={styles.buttonText}>Go to Sign In</Text>
               </Pressable>
             </>
           )}

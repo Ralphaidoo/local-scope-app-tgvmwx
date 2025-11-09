@@ -23,30 +23,42 @@ import "react-native-reanimated";
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user, session, isLoading, isAuthenticated } = useAuth();
   const segments = useSegments();
   const navigationState = useRootNavigationState();
 
   useEffect(() => {
-    if (!navigationState?.key || isLoading) {
-      console.log('Navigation not ready or auth loading');
+    if (!navigationState?.key) {
+      console.log('Navigation not ready');
+      return;
+    }
+
+    if (isLoading) {
+      console.log('Auth still loading');
       return;
     }
 
     const inAuthGroup = segments[0] === 'auth' || segments[0] === 'onboarding' || segments[0] === 'email-confirmed';
     
-    console.log('Auth state:', { isAuthenticated, isLoading, user: user?.email, segments, inAuthGroup });
+    console.log('Auth guard check:', { 
+      isAuthenticated, 
+      hasUser: !!user, 
+      hasSession: !!session,
+      segments, 
+      inAuthGroup 
+    });
 
+    // Only redirect if we have a clear auth state
     if (!isAuthenticated && !inAuthGroup) {
-      // Redirect to auth if not authenticated and not already in auth flow
+      // User is not authenticated and not in auth flow - redirect to auth
       console.log('Redirecting to auth - user not authenticated');
       router.replace('/auth');
     } else if (isAuthenticated && inAuthGroup) {
-      // Redirect to home if authenticated and in auth flow
+      // User is authenticated and in auth flow - redirect to home
       console.log('Redirecting to home - user authenticated');
       router.replace('/(tabs)/(home)/');
     }
-  }, [isAuthenticated, segments, navigationState?.key, isLoading]);
+  }, [isAuthenticated, segments, navigationState?.key, isLoading, user, session]);
 
   // Show loading screen while checking authentication
   if (isLoading || !navigationState?.key) {
