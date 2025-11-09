@@ -42,6 +42,7 @@ export interface Business {
   reviewCount: number;
   createdAt: string;
   updatedAt: string;
+  moderationStatus?: 'pending' | 'approved' | 'rejected';
 }
 
 export interface WorkingHours {
@@ -201,11 +202,14 @@ export interface Message {
 export interface PromoCode {
   id: string;
   code: string;
-  discount: number; // percentage
-  validUntil: string;
-  usageLimit: number;
+  type: 'percentage' | 'fixed';
+  value: number;
+  minimumAmount?: number;
+  usageLimit?: number;
   usedCount: number;
+  expiresAt?: string;
   active: boolean;
+  createdAt: string;
 }
 
 export interface Subscription {
@@ -235,6 +239,7 @@ export interface WithdrawalRequest {
   status: 'pending' | 'approved' | 'rejected' | 'completed';
   requestedAt: string;
   processedAt?: string;
+  notes?: string;
 }
 
 export interface SearchFilters {
@@ -254,4 +259,30 @@ export interface BoroughRegion {
   businessCount: number;
   color: string;
   position: { x: number; y: number };
+}
+
+export interface PlatformAnalytics {
+  id: string;
+  date: string;
+  totalUsers: number;
+  newUsers: number;
+  totalBusinesses: number;
+  newBusinesses: number;
+  totalOrders: number;
+  totalBookings: number;
+  totalRevenue: number;
+  totalWithdrawals: number;
+  activeUsers: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminAction {
+  id: string;
+  adminId: string;
+  actionType: string;
+  targetType: string;
+  targetId: string;
+  details?: any;
+  createdAt: string;
 }
