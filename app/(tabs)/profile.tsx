@@ -53,6 +53,8 @@ export default function ProfileScreen() {
       console.log('User before refresh:', JSON.stringify(user, null, 2));
       setIsRefreshing(true);
       await refreshUser();
+      // Wait a bit for the state to update
+      await new Promise(resolve => setTimeout(resolve, 100));
       console.log('User after refresh:', JSON.stringify(user, null, 2));
       Alert.alert('Success', 'Profile refreshed successfully!');
     } catch (error) {
@@ -146,7 +148,11 @@ export default function ProfileScreen() {
   const userTypeInfo = getUserTypeDisplay();
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
+    <SafeAreaView 
+      style={[styles.safeArea, { backgroundColor: theme.colors.background }]} 
+      edges={['top']}
+      key={`profile-${user.id}-${user.userType}`}
+    >
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Profile</Text>
         <Pressable

@@ -26,6 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
+  const [refreshCounter, setRefreshCounter] = useState(0);
 
   useEffect(() => {
     // Get initial session
@@ -114,9 +115,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('Setting refreshed user data with userType:', userData.userType);
           console.log('Full user data being set:', JSON.stringify(userData, null, 2));
           
-          // Force a state update by creating a completely new object
-          setUser({ ...userData });
-          setIsLoading(false);
+          // Force a complete state update by setting to null first, then the new data
+          // This ensures React detects the change
+          setUser(null);
+          // Use setTimeout to ensure the null state is processed
+          setTimeout(() => {
+            setUser(userData);
+            setRefreshCounter(prev => prev + 1);
+            setIsLoading(false);
+          }, 0);
           return;
         }
       }
@@ -237,7 +244,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
       setUser(minimalUser);
     } finally {
-      setIsLoading(false);
+      if (!forceRefresh) {
+        setIsLoading(false);
+      }
     }
   };
 
