@@ -8,6 +8,7 @@ import { GlassView } from 'expo-glass-effect';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface DashboardStats {
   totalUsers: number;
@@ -73,7 +74,7 @@ interface PromoCode {
   created_at: string;
 }
 
-type TabType = 'overview' | 'users' | 'businesses' | 'withdrawals' | 'promos' | 'analytics' | 'admins';
+type TabType = 'overview' | 'users' | 'businesses' | 'withdrawals' | 'promos' | 'analytics' | 'admins' | 'data';
 
 export default function AdminScreen() {
   const theme = useTheme();
@@ -615,6 +616,55 @@ export default function AdminScreen() {
       console.error('Error toggling promo code:', error);
       Alert.alert('Error', 'Failed to toggle promo code');
     }
+  };
+
+  const handleDeleteAllSampleData = async () => {
+    Alert.alert(
+      'Delete All Sample Data',
+      'This will clear all local sample data including favorites, cart items, bookings, and payment methods stored in AsyncStorage. This action cannot be undone. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete All',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Clear all AsyncStorage keys related to sample data
+              const keysToRemove = [
+                'favorites',
+                'cart',
+                'bookings',
+                'paymentMethods',
+                'settings',
+                'orders',
+              ];
+
+              await Promise.all(
+                keysToRemove.map(key => AsyncStorage.removeItem(key))
+              );
+
+              // Log admin action
+              await supabase.from('admin_actions').insert({
+                action_type: 'delete_sample_data',
+                target_type: 'system',
+                details: { cleared_keys: keysToRemove },
+              });
+
+              Alert.alert(
+                'Success',
+                'All sample data has been cleared from local storage. Users will need to restart the app to see the changes.',
+                [{ text: 'OK' }]
+              );
+
+              console.log('Sample data cleared successfully');
+            } catch (error) {
+              console.error('Error clearing sample data:', error);
+              Alert.alert('Error', 'Failed to clear sample data');
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (user?.userType !== 'admin') {
@@ -1217,6 +1267,81 @@ export default function AdminScreen() {
     </View>
   );
 
+  const renderDataManagement = () => (
+    <View>
+      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Data Management</Text>
+      <Text style={[styles.sectionDescription, { color: theme.dark ? '#98989D' : '#666' }]}>
+        Manage sample and test data in the application
+      </Text>
+
+      <GlassView
+        style={[
+          styles.dataCard,
+          Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+        ]}
+        glassEffectStyle="regular"
+      >
+        <View style={styles.dataCardHeader}>
+          <IconSymbol name="trash.fill" color="#FF3B30" size={32} />
+          <Text style={[styles.dataCardTitle, { color: theme.colors.text }]}>
+            Delete All Sample Data
+          </Text>
+        </View>
+        <Text style={[styles.dataCardDescription, { color: theme.dark ? '#98989D' : '#666' }]}>
+          This will clear all local sample data including:
+        </Text>
+        <View style={styles.dataList}>
+          <View style={styles.dataListItem}>
+            <IconSymbol name="checkmark.circle.fill" color="#007AFF" size={20} />
+            <Text style={[styles.dataListText, { color: theme.colors.text }]}>
+              Favorite businesses
+            </Text>
+          </View>
+          <View style={styles.dataListItem}>
+            <IconSymbol name="checkmark.circle.fill" color="#007AFF" size={20} />
+            <Text style={[styles.dataListText, { color: theme.colors.text }]}>
+              Shopping cart items
+            </Text>
+          </View>
+          <View style={styles.dataListItem}>
+            <IconSymbol name="checkmark.circle.fill" color="#007AFF" size={20} />
+            <Text style={[styles.dataListText, { color: theme.colors.text }]}>
+              Booking history
+            </Text>
+          </View>
+          <View style={styles.dataListItem}>
+            <IconSymbol name="checkmark.circle.fill" color="#007AFF" size={20} />
+            <Text style={[styles.dataListText, { color: theme.colors.text }]}>
+              Payment methods
+            </Text>
+          </View>
+          <View style={styles.dataListItem}>
+            <IconSymbol name="checkmark.circle.fill" color="#007AFF" size={20} />
+            <Text style={[styles.dataListText, { color: theme.colors.text }]}>
+              User settings
+            </Text>
+          </View>
+        </View>
+        <View style={[styles.warningBox, { backgroundColor: theme.dark ? 'rgba(255,59,48,0.2)' : 'rgba(255,59,48,0.1)' }]}>
+          <IconSymbol name="exclamationmark.triangle.fill" color="#FF3B30" size={20} />
+          <Text style={[styles.warningText, { color: theme.colors.text }]}>
+            This action cannot be undone. Users will need to restart the app to see changes.
+          </Text>
+        </View>
+        <Pressable
+          style={({ pressed }) => [
+            styles.deleteButton,
+            { opacity: pressed ? 0.7 : 1 }
+          ]}
+          onPress={handleDeleteAllSampleData}
+        >
+          <IconSymbol name="trash.fill" color="#fff" size={20} />
+          <Text style={styles.deleteButtonText}>Delete All Sample Data</Text>
+        </Pressable>
+      </GlassView>
+    </View>
+  );
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
       <View style={styles.header}>
@@ -1238,6 +1363,7 @@ export default function AdminScreen() {
           { key: 'withdrawals', label: 'Withdrawals', icon: 'sterlingsign.circle.fill' },
           { key: 'promos', label: 'Promo Codes', icon: 'tag.fill' },
           { key: 'analytics', label: 'Analytics', icon: 'chart.line.uptrend.xyaxis' },
+          { key: 'data', label: 'Data', icon: 'externaldrive.fill' },
         ].map((tab) => (
           <Pressable
             key={tab.key}
@@ -1282,6 +1408,7 @@ export default function AdminScreen() {
         {activeTab === 'withdrawals' && renderWithdrawals()}
         {activeTab === 'promos' && renderPromoCodes()}
         {activeTab === 'analytics' && renderAnalytics()}
+        {activeTab === 'data' && renderDataManagement()}
       </ScrollView>
 
       {/* Create Admin Modal */}
@@ -1631,6 +1758,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 12,
   },
+  sectionDescription: {
+    fontSize: 14,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1742,6 +1874,64 @@ const styles = StyleSheet.create({
   },
   analyticsValue: {
     fontSize: 18,
+    fontWeight: '600',
+  },
+  dataCard: {
+    padding: 20,
+    borderRadius: 12,
+  },
+  dataCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  dataCardTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  dataCardDescription: {
+    fontSize: 14,
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  dataList: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  dataListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dataListText: {
+    fontSize: 14,
+  },
+  warningBox: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  deleteButton: {
+    backgroundColor: '#FF3B30',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
   },
   modalOverlay: {
