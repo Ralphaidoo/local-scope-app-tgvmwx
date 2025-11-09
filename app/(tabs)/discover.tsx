@@ -16,7 +16,7 @@ export default function DiscoverScreen() {
   const [selectedCategory, setSelectedCategory] = useState<BusinessCategory | null>(null);
   const [selectedBoroughs, setSelectedBoroughs] = useState<LondonBorough[]>([]);
   const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>('map');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [showFilters, setShowFilters] = useState(false);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [minRating, setMinRating] = useState(0);
