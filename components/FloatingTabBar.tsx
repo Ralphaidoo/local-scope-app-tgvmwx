@@ -1,3 +1,4 @@
+
 import React from 'react';
 import {
   View,
@@ -37,8 +38,8 @@ interface FloatingTabBarProps {
 
 export default function FloatingTabBar({
   tabs,
-  containerWidth = 240,
-  borderRadius = 25,
+  containerWidth,
+  borderRadius,
   bottomMargin
 }: FloatingTabBarProps) {
   const router = useRouter();
@@ -96,10 +97,8 @@ export default function FloatingTabBar({
     router.push(route);
   };
 
-  // Remove unnecessary tabBarStyle animation to prevent flickering
-
   const indicatorStyle = useAnimatedStyle(() => {
-    const tabWidth = (containerWidth - 16) / tabs.length; // Account for container padding (8px on each side)
+    const tabWidth = screenWidth / tabs.length;
     return {
       transform: [
         {
@@ -120,53 +119,51 @@ export default function FloatingTabBar({
       ...Platform.select({
         ios: {
           backgroundColor: theme.dark
-            ? 'rgba(28, 28, 30, 0.8)'
-            : 'rgba(255, 255, 255, 0.8)',
+            ? 'rgba(28, 28, 30, 0.95)'
+            : 'rgba(255, 255, 255, 0.95)',
         },
         android: {
           backgroundColor: theme.dark
-            ? 'rgba(28, 28, 30, 0.95)'
-            : 'rgba(255, 255, 255, 0.95)',
+            ? 'rgba(28, 28, 30, 0.98)'
+            : 'rgba(255, 255, 255, 0.98)',
           elevation: 8,
         },
         web: {
           backgroundColor: theme.dark
-            ? 'rgba(28, 28, 30, 0.95)'
-            : 'rgba(255, 255, 255, 0.95)',
+            ? 'rgba(28, 28, 30, 0.98)'
+            : 'rgba(255, 255, 255, 0.98)',
           backdropFilter: 'blur(10px)',
           boxShadow: theme.dark
-            ? '0 8px 32px rgba(0, 0, 0, 0.4)'
-            : '0 8px 32px rgba(0, 0, 0, 0.1)',
+            ? '0 -2px 10px rgba(0, 0, 0, 0.3)'
+            : '0 -2px 10px rgba(0, 0, 0, 0.1)',
         },
       }),
+      borderTopWidth: 1,
+      borderTopColor: theme.dark
+        ? 'rgba(255, 255, 255, 0.1)'
+        : 'rgba(0, 0, 0, 0.1)',
     },
     background: {
       ...styles.background,
       backgroundColor: theme.dark
-        ? (Platform.OS === 'ios' ? 'transparent' : 'rgba(28, 28, 30, 0.1)')
-        : (Platform.OS === 'ios' ? 'transparent' : 'rgba(255, 255, 255, 0.1)'),
+        ? (Platform.OS === 'ios' ? 'transparent' : 'rgba(28, 28, 30, 0.05)')
+        : (Platform.OS === 'ios' ? 'transparent' : 'rgba(255, 255, 255, 0.05)'),
     },
     indicator: {
       ...styles.indicator,
       backgroundColor: theme.dark
-        ? 'rgba(255, 255, 255, 0.08)' // Subtle white overlay in dark mode
-        : 'rgba(0, 0, 0, 0.04)', // Subtle black overlay in light mode
-      width: `${(100 / tabs.length) - 3}%`, // Dynamic width based on number of tabs
+        ? 'rgba(255, 255, 255, 0.1)' // Subtle white overlay in dark mode
+        : 'rgba(0, 0, 0, 0.05)', // Subtle black overlay in light mode
+      width: screenWidth / tabs.length,
     },
   };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-      <View style={[
-        styles.container,
-        {
-          width: containerWidth,
-          marginBottom: bottomMargin ?? (Platform.OS === 'ios' ? 10 : 20)
-        }
-      ]}>
+      <View style={styles.container}>
         <BlurView
           intensity={Platform.OS === 'web' ? 0 : 80}
-          style={[dynamicStyles.blurContainer, { borderRadius }]}
+          style={dynamicStyles.blurContainer}
         >
           <View style={dynamicStyles.background} />
           <Animated.View style={[dynamicStyles.indicator, indicatorStyle]} />
@@ -214,35 +211,29 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1000,
-    alignItems: 'center', // Center the content
   },
   container: {
-    marginHorizontal: 20,
-    alignSelf: 'center',
-    // width and marginBottom handled dynamically via props
+    width: '100%',
   },
   blurContainer: {
+    width: '100%',
     overflow: 'hidden',
-    // borderRadius and other styling applied dynamically
   },
   background: {
     ...StyleSheet.absoluteFillObject,
-    // Dynamic styling applied in component
   },
   indicator: {
     position: 'absolute',
-    top: 8,
-    left: 8,
-    bottom: 8,
-    borderRadius: 17,
-    width: `${(100 / 2) - 3}%`, // Default for 2 tabs, will be overridden by dynamic styles
-    // Dynamic styling applied in component
+    top: 0,
+    left: 0,
+    height: 3,
+    borderRadius: 0,
   },
   tabsContainer: {
     flexDirection: 'row',
     height: 60,
     alignItems: 'center',
-    paddingHorizontal: 8,
+    width: '100%',
   },
   tab: {
     flex: 1,
@@ -259,6 +250,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     marginTop: 2,
-    // Dynamic styling applied in component
   },
 });
