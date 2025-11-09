@@ -17,6 +17,7 @@ interface DashboardStats {
   pendingWithdrawals: number;
   pendingBusinesses: number;
   activePromoCodes: number;
+  totalAdmins: number;
 }
 
 interface User {
@@ -72,7 +73,7 @@ interface PromoCode {
   created_at: string;
 }
 
-type TabType = 'overview' | 'users' | 'businesses' | 'withdrawals' | 'promos' | 'analytics';
+type TabType = 'overview' | 'users' | 'businesses' | 'withdrawals' | 'promos' | 'analytics' | 'admins';
 
 export default function AdminScreen() {
   const theme = useTheme();
@@ -90,20 +91,28 @@ export default function AdminScreen() {
     pendingWithdrawals: 0,
     pendingBusinesses: 0,
     activePromoCodes: 0,
+    totalAdmins: 0,
   });
   const [users, setUsers] = useState<User[]>([]);
+  const [adminUsers, setAdminUsers] = useState<User[]>([]);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
 
   // Modal states
   const [showPromoModal, setShowPromoModal] = useState(false);
+  const [showAdminModal, setShowAdminModal] = useState(false);
   const [newPromoCode, setNewPromoCode] = useState({
     code: '',
     type: 'percentage',
     value: '',
     usageLimit: '',
     expiresAt: '',
+  });
+  const [newAdmin, setNewAdmin] = useState({
+    email: '',
+    password: '',
+    fullName: '',
   });
 
   useEffect(() => {
@@ -118,6 +127,7 @@ export default function AdminScreen() {
       await Promise.all([
         loadStats(),
         loadUsers(),
+        loadAdminUsers(),
         loadBusinesses(),
         loadWithdrawals(),
         loadPromoCodes(),
@@ -136,6 +146,12 @@ export default function AdminScreen() {
       const { count: usersCount } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true });
+
+      // Get total admins
+      const { count: adminsCount } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'admin');
 
       // Get total businesses
       const { count: businessesCount } = await supabase
@@ -181,6 +197,7 @@ export default function AdminScreen() {
         pendingWithdrawals: pendingWithdrawalsCount || 0,
         pendingBusinesses: pendingBusinessesCount || 0,
         activePromoCodes: activePromoCodesCount || 0,
+        totalAdmins: adminsCount || 0,
       });
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -192,6 +209,7 @@ export default function AdminScreen() {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, email, role, user_type, subscription_plan, created_at')
+        .neq('role', 'admin')
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -199,6 +217,21 @@ export default function AdminScreen() {
       setUsers(data || []);
     } catch (error) {
       console.error('Error loading users:', error);
+    }
+  };
+
+  const loadAdminUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, role, user_type, subscription_plan, created_at')
+        .eq('role', 'admin')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setAdminUsers(data || []);
+    } catch (error) {
+      console.error('Error loading admin users:', error);
     }
   };
 
@@ -293,7 +326,7 @@ export default function AdminScreen() {
               } else if (action === 'promote') {
                 const { error } = await supabase
                   .from('profiles')
-                  .update({ role: 'admin' })
+                  .update({ role: 'admin', user_type: 'admin' })
                   .eq('id', userId);
                 if (error) throw error;
               }
@@ -307,9 +340,124 @@ export default function AdminScreen() {
 
               Alert.alert('Success', `User ${action}ed successfully`);
               loadUsers();
+              loadAdminUsers();
+              loadStats();
             } catch (error) {
               console.error(`Error ${action}ing user:`, error);
               Alert.alert('Error', `Failed to ${action} user`);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleCreateAdmin = async () => {
+    if (!newAdmin.email || !newAdmin.password || !newAdmin.fullName) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (newAdmin.password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
+
+    try {
+      // Create auth user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: newAdmin.email,
+        password: newAdmin.password,
+        options: {
+          emailRedirectTo: 'https://natively.dev/email-confirmed',
+          data: {
+            full_name: newAdmin.fullName,
+            user_type: 'admin',
+          }
+        }
+      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        // Create admin profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: authData.user.id,
+            email: newAdmin.email,
+            full_name: newAdmin.fullName,
+            role: 'admin',
+            user_type: 'admin',
+            subscription_plan: 'pro',
+            business_listing_count: 0,
+            has_completed_onboarding: true,
+          });
+
+        if (profileError) throw profileError;
+
+        // Log admin action
+        await supabase.from('admin_actions').insert({
+          action_type: 'create_admin',
+          target_type: 'user',
+          target_id: authData.user.id,
+          details: { email: newAdmin.email, full_name: newAdmin.fullName },
+        });
+
+        Alert.alert(
+          'Success',
+          'Admin user created successfully! They will need to verify their email before logging in.',
+          [{ text: 'OK', onPress: () => {
+            setShowAdminModal(false);
+            setNewAdmin({ email: '', password: '', fullName: '' });
+            loadAdminUsers();
+            loadStats();
+          }}]
+        );
+      }
+    } catch (error: any) {
+      console.error('Error creating admin:', error);
+      Alert.alert('Error', error.message || 'Failed to create admin user');
+    }
+  };
+
+  const handleRemoveAdmin = async (userId: string, userEmail: string) => {
+    if (userId === user?.id) {
+      Alert.alert('Error', 'You cannot remove yourself as an admin');
+      return;
+    }
+
+    Alert.alert(
+      'Confirm Action',
+      `Are you sure you want to remove admin privileges from ${userEmail}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('profiles')
+                .update({ role: 'customer', user_type: 'customer' })
+                .eq('id', userId);
+
+              if (error) throw error;
+
+              // Log admin action
+              await supabase.from('admin_actions').insert({
+                action_type: 'remove_admin',
+                target_type: 'user',
+                target_id: userId,
+              });
+
+              Alert.alert('Success', 'Admin privileges removed successfully');
+              loadAdminUsers();
+              loadUsers();
+              loadStats();
+            } catch (error) {
+              console.error('Error removing admin:', error);
+              Alert.alert('Error', 'Failed to remove admin privileges');
             }
           },
         },
@@ -506,6 +654,20 @@ export default function AdminScreen() {
           ]}
           glassEffectStyle="regular"
         >
+          <View style={[styles.statIcon, { backgroundColor: '#FF3B30' }]}>
+            <IconSymbol name="shield.fill" color="#fff" size={24} />
+          </View>
+          <Text style={[styles.statValue, { color: theme.colors.text }]}>{stats.totalAdmins}</Text>
+          <Text style={[styles.statLabel, { color: theme.dark ? '#98989D' : '#666' }]}>Admins</Text>
+        </GlassView>
+
+        <GlassView
+          style={[
+            styles.statCard,
+            Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+          ]}
+          glassEffectStyle="regular"
+        >
           <View style={[styles.statIcon, { backgroundColor: '#34C759' }]}>
             <IconSymbol name="building.2.fill" color="#fff" size={24} />
           </View>
@@ -607,6 +769,80 @@ export default function AdminScreen() {
           </Pressable>
         )}
       </View>
+    </View>
+  );
+
+  const renderAdmins = () => (
+    <View>
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Admin Users</Text>
+          <Text style={[styles.sectionSubtitle, { color: theme.dark ? '#98989D' : '#666' }]}>
+            {adminUsers.length} admin{adminUsers.length !== 1 ? 's' : ''}
+          </Text>
+        </View>
+        <Pressable
+          style={({ pressed }) => [
+            styles.addButton,
+            { opacity: pressed ? 0.7 : 1 }
+          ]}
+          onPress={() => setShowAdminModal(true)}
+        >
+          <IconSymbol name="plus.circle.fill" color="#007AFF" size={32} />
+        </Pressable>
+      </View>
+
+      {adminUsers.map((admin) => (
+        <GlassView
+          key={admin.id}
+          style={[
+            styles.listCard,
+            Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+          ]}
+          glassEffectStyle="regular"
+        >
+          <View style={styles.listCardHeader}>
+            <View style={styles.listCardInfo}>
+              <View style={styles.adminHeaderRow}>
+                <IconSymbol name="shield.fill" color="#FF3B30" size={24} />
+                <Text style={[styles.listCardTitle, { color: theme.colors.text, marginLeft: 8 }]}>
+                  {admin.full_name || 'No name'}
+                </Text>
+              </View>
+              <Text style={[styles.listCardSubtitle, { color: theme.dark ? '#98989D' : '#666' }]}>
+                {admin.email}
+              </Text>
+              <Text style={[styles.listCardSubtitle, { color: theme.dark ? '#98989D' : '#666' }]}>
+                Created: {new Date(admin.created_at).toLocaleDateString()}
+              </Text>
+              <View style={styles.badgeContainer}>
+                <View style={[styles.badge, { backgroundColor: '#FF3B30' }]}>
+                  <Text style={styles.badgeText}>Admin</Text>
+                </View>
+                {admin.id === user?.id && (
+                  <View style={[styles.badge, { backgroundColor: '#007AFF' }]}>
+                    <Text style={styles.badgeText}>You</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
+
+          {admin.id !== user?.id && (
+            <View style={styles.listCardActions}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.actionButton,
+                  { opacity: pressed ? 0.7 : 1, backgroundColor: '#FF9500' }
+                ]}
+                onPress={() => handleRemoveAdmin(admin.id, admin.email)}
+              >
+                <Text style={styles.actionButtonText}>Remove Admin</Text>
+              </Pressable>
+            </View>
+          )}
+        </GlassView>
+      ))}
     </View>
   );
 
@@ -939,6 +1175,14 @@ export default function AdminScreen() {
         </View>
         <View style={styles.analyticsRow}>
           <Text style={[styles.analyticsLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
+            Total Admins
+          </Text>
+          <Text style={[styles.analyticsValue, { color: theme.colors.text }]}>
+            {stats.totalAdmins}
+          </Text>
+        </View>
+        <View style={styles.analyticsRow}>
+          <Text style={[styles.analyticsLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
             Total Businesses
           </Text>
           <Text style={[styles.analyticsValue, { color: theme.colors.text }]}>
@@ -988,6 +1232,7 @@ export default function AdminScreen() {
       >
         {[
           { key: 'overview', label: 'Overview', icon: 'chart.bar.fill' },
+          { key: 'admins', label: 'Admins', icon: 'shield.fill' },
           { key: 'users', label: 'Users', icon: 'person.3.fill' },
           { key: 'businesses', label: 'Businesses', icon: 'building.2.fill' },
           { key: 'withdrawals', label: 'Withdrawals', icon: 'sterlingsign.circle.fill' },
@@ -1031,12 +1276,119 @@ export default function AdminScreen() {
         }
       >
         {activeTab === 'overview' && renderOverview()}
+        {activeTab === 'admins' && renderAdmins()}
         {activeTab === 'users' && renderUsers()}
         {activeTab === 'businesses' && renderBusinesses()}
         {activeTab === 'withdrawals' && renderWithdrawals()}
         {activeTab === 'promos' && renderPromoCodes()}
         {activeTab === 'analytics' && renderAnalytics()}
       </ScrollView>
+
+      {/* Create Admin Modal */}
+      <Modal
+        visible={showAdminModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAdminModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <GlassView
+            style={[
+              styles.modalContent,
+              Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(0,0,0,0.9)' : 'rgba(255,255,255,0.9)' }
+            ]}
+            glassEffectStyle="regular"
+          >
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <IconSymbol name="shield.fill" color="#FF3B30" size={28} />
+                <Text style={[styles.modalTitle, { color: theme.colors.text, marginLeft: 8 }]}>Create Admin User</Text>
+              </View>
+              <Pressable onPress={() => setShowAdminModal(false)}>
+                <IconSymbol name="xmark.circle.fill" color={theme.dark ? '#98989D' : '#666'} size={28} />
+              </Pressable>
+            </View>
+
+            <View style={styles.modalBody}>
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Full Name *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      color: theme.colors.text,
+                      backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                      borderColor: theme.dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)',
+                    }
+                  ]}
+                  placeholder="John Doe"
+                  placeholderTextColor={theme.dark ? '#98989D' : '#999'}
+                  value={newAdmin.fullName}
+                  onChangeText={(text) => setNewAdmin({ ...newAdmin, fullName: text })}
+                  autoCapitalize="words"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Email *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      color: theme.colors.text,
+                      backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                      borderColor: theme.dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)',
+                    }
+                  ]}
+                  placeholder="admin@example.com"
+                  placeholderTextColor={theme.dark ? '#98989D' : '#999'}
+                  value={newAdmin.email}
+                  onChangeText={(text) => setNewAdmin({ ...newAdmin, email: text })}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Password *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      color: theme.colors.text,
+                      backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                      borderColor: theme.dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)',
+                    }
+                  ]}
+                  placeholder="Min. 6 characters"
+                  placeholderTextColor={theme.dark ? '#98989D' : '#999'}
+                  value={newAdmin.password}
+                  onChangeText={(text) => setNewAdmin({ ...newAdmin, password: text })}
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={[styles.infoBox, { backgroundColor: theme.dark ? 'rgba(0,122,255,0.2)' : 'rgba(0,122,255,0.1)' }]}>
+                <IconSymbol name="info.circle.fill" color="#007AFF" size={20} />
+                <Text style={[styles.infoText, { color: theme.colors.text }]}>
+                  The new admin will receive an email to verify their account before they can log in.
+                </Text>
+              </View>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.createButton,
+                  { opacity: pressed ? 0.7 : 1 }
+                ]}
+                onPress={handleCreateAdmin}
+              >
+                <Text style={styles.createButtonText}>Create Admin User</Text>
+              </Pressable>
+            </View>
+          </GlassView>
+        </View>
+      </Modal>
 
       {/* Create Promo Code Modal */}
       <Modal
@@ -1334,6 +1686,10 @@ const styles = StyleSheet.create({
   listCardSubtitle: {
     fontSize: 14,
   },
+  adminHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   badgeContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1411,6 +1767,10 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
   },
+  modalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   modalBody: {
     gap: 16,
   },
@@ -1445,6 +1805,18 @@ const styles = StyleSheet.create({
   typeButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  infoBox: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'flex-start',
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
   },
   createButton: {
     backgroundColor: '#007AFF',
