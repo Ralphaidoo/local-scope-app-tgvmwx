@@ -94,11 +94,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             full_name: profile.full_name
           });
           
+          // Determine the actual user type - prioritize 'role' field over 'user_type'
+          // This ensures admin status is properly recognized
+          let actualUserType: UserType = 'customer';
+          if (profile.role === 'admin' || profile.user_type === 'admin') {
+            actualUserType = 'admin';
+          } else if (profile.role === 'business_user' || profile.user_type === 'business_user') {
+            actualUserType = 'business_user';
+          } else {
+            actualUserType = 'customer';
+          }
+          
+          console.log('Determined user type:', actualUserType, 'from role:', profile.role, 'and user_type:', profile.user_type);
+          
           const userData: User = {
             id: profile.id,
             email: profile.email || userEmail,
             fullName: profile.full_name || '',
-            userType: (profile.user_type as UserType) || 'customer',
+            userType: actualUserType,
             phone: profile.phone || undefined,
             createdAt: profile.created_at || new Date().toISOString(),
             subscriptionPlan: (profile.subscription_plan as SubscriptionPlan) || 'free',
@@ -145,6 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   email: userEmail,
                   full_name: '',
                   user_type: 'customer',
+                  role: 'customer',
                 })
                 .select()
                 .single();
@@ -182,11 +196,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           full_name: profile.full_name
         });
         
+        // Determine the actual user type - prioritize 'role' field over 'user_type'
+        // This ensures admin status is properly recognized
+        let actualUserType: UserType = 'customer';
+        if (profile.role === 'admin' || profile.user_type === 'admin') {
+          actualUserType = 'admin';
+        } else if (profile.role === 'business_user' || profile.user_type === 'business_user') {
+          actualUserType = 'business_user';
+        } else {
+          actualUserType = 'customer';
+        }
+        
+        console.log('Determined user type:', actualUserType, 'from role:', profile.role, 'and user_type:', profile.user_type);
+        
         const userData: User = {
           id: profile.id,
           email: profile.email || userEmail,
           fullName: profile.full_name || '',
-          userType: (profile.user_type as UserType) || 'customer',
+          userType: actualUserType,
           phone: profile.phone || undefined,
           createdAt: profile.created_at || new Date().toISOString(),
           subscriptionPlan: (profile.subscription_plan as SubscriptionPlan) || 'free',
@@ -349,7 +376,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const profileUpdates: any = {};
       if (updates.fullName !== undefined) profileUpdates.full_name = updates.fullName;
       if (updates.phone !== undefined) profileUpdates.phone = updates.phone;
-      if (updates.userType !== undefined) profileUpdates.user_type = updates.userType;
+      if (updates.userType !== undefined) {
+        profileUpdates.user_type = updates.userType;
+        profileUpdates.role = updates.userType; // Keep both fields in sync
+      }
       if (updates.subscriptionPlan !== undefined) profileUpdates.subscription_plan = updates.subscriptionPlan;
       if (updates.businessListingCount !== undefined) profileUpdates.business_listing_count = updates.businessListingCount;
 
