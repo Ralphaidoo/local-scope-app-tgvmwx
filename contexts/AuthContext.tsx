@@ -100,6 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const actualUserType: UserType = profile.user_type || 'customer';
           
           console.log('User type from profile:', actualUserType);
+          console.log('Is admin check (user.user_type === admin):', actualUserType === 'admin');
           
           const userData: User = {
             id: profile.id,
@@ -201,6 +202,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const actualUserType: UserType = profile.user_type || 'customer';
         
         console.log('User type from profile:', actualUserType);
+        console.log('Is admin check (user.user_type === admin):', actualUserType === 'admin');
         
         const userData: User = {
           id: profile.id,
@@ -434,8 +436,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const canAddBusiness = (): boolean => {
     if (!user) return false;
     
-    // Admin users can always add businesses
-    if (user.userType === 'admin') return true;
+    // Admin users can always add businesses (user.user_type === 'admin')
+    if (user.userType === 'admin') {
+      console.log('Admin user - can add business');
+      return true;
+    }
     
     // Business users need to check their limit
     if (user.userType !== 'business_user') return false;
@@ -449,8 +454,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const getBusinessLimit = (): number => {
     if (!user) return 0;
     
-    // Admin users have unlimited businesses
-    if (user.userType === 'admin') return 999;
+    // Admin users have unlimited businesses (user.user_type === 'admin')
+    if (user.userType === 'admin') {
+      console.log('Admin user - unlimited business limit');
+      return 999;
+    }
     
     // Business users have limits based on their plan
     if (user.userType !== 'business_user') return 0;

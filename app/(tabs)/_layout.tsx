@@ -26,23 +26,9 @@ export default function TabLayout() {
       },
     ];
 
-    if (user?.userType === 'business_user') {
-      return [
-        ...baseTabs,
-        {
-          name: 'dashboard',
-          route: '/(tabs)/dashboard',
-          icon: 'chart.bar.fill',
-          label: 'Dashboard',
-        },
-        {
-          name: 'profile',
-          route: '/(tabs)/profile',
-          icon: 'person.fill',
-          label: 'Profile',
-        },
-      ];
-    } else if (user?.userType === 'admin') {
+    // Check if user is admin (user.user_type === 'admin')
+    if (user?.userType === 'admin') {
+      console.log('Admin user detected - showing admin tabs');
       return [
         ...baseTabs,
         {
@@ -64,7 +50,25 @@ export default function TabLayout() {
           label: 'Profile',
         },
       ];
+    } else if (user?.userType === 'business_user') {
+      console.log('Business user detected - showing business tabs');
+      return [
+        ...baseTabs,
+        {
+          name: 'dashboard',
+          route: '/(tabs)/dashboard',
+          icon: 'chart.bar.fill',
+          label: 'Dashboard',
+        },
+        {
+          name: 'profile',
+          route: '/(tabs)/profile',
+          icon: 'person.fill',
+          label: 'Profile',
+        },
+      ];
     } else {
+      console.log('Customer user detected - showing customer tabs');
       return [
         ...baseTabs,
         {

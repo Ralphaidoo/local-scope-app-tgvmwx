@@ -30,6 +30,9 @@ export default function BusinessManagementScreen() {
   const businessLimit = getBusinessLimit();
   const currentBusinessCount = user?.businessListingCount || 0;
   const subscriptionPlan = user?.subscriptionPlan || 'free';
+  
+  // Check if user is admin (user.user_type === 'admin')
+  const isAdmin = user?.userType === 'admin';
 
   const handleSubmit = async () => {
     if (!canAddBusiness()) {
@@ -56,6 +59,7 @@ export default function BusinessManagementScreen() {
 
     try {
       console.log('Submitting business...');
+      console.log('User is admin (user.user_type === admin):', isAdmin);
       
       // Get user's profile ID
       const { data: profile, error: profileError } = await supabase
@@ -99,16 +103,18 @@ export default function BusinessManagementScreen() {
 
       console.log('Business created:', business);
 
-      // Update business listing count
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ 
-          business_listing_count: currentBusinessCount + 1 
-        })
-        .eq('user_id', user?.id);
+      // Update business listing count (unless admin with unlimited)
+      if (!isAdmin) {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ 
+            business_listing_count: currentBusinessCount + 1 
+          })
+          .eq('user_id', user?.id);
 
-      if (updateError) {
-        console.log('Error updating business count:', updateError);
+        if (updateError) {
+          console.log('Error updating business count:', updateError);
+        }
       }
 
       // Refresh user data
@@ -393,8 +399,24 @@ export default function BusinessManagementScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Admin Badge */}
+        {isAdmin && (
+          <GlassView
+            style={[
+              styles.adminBadge,
+              Platform.OS !== 'ios' && { backgroundColor: 'rgba(255, 59, 48, 0.1)' }
+            ]}
+            glassEffectStyle="regular"
+          >
+            <IconSymbol name="checkmark.shield.fill" color="#FF3B30" size={24} />
+            <Text style={[styles.adminBadgeText, { color: theme.colors.text }]}>
+              Admin Access - Unlimited Businesses
+            </Text>
+          </GlassView>
+        )}
+
         {/* Subscription Warning */}
-        {!canAddBusiness() && (
+        {!canAddBusiness() && !isAdmin && (
           <GlassView
             style={[
               styles.warningCard,
@@ -424,30 +446,32 @@ export default function BusinessManagementScreen() {
         )}
 
         {/* Business Limit Info */}
-        <GlassView
-          style={[
-            styles.infoCard,
-            Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
-          ]}
-          glassEffectStyle="regular"
-        >
-          <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
-              Current Plan:
-            </Text>
-            <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-              {subscriptionPlan === 'free' ? 'Free' : 'Pro'}
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
-              Businesses:
-            </Text>
-            <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-              {currentBusinessCount} / {businessLimit}
-            </Text>
-          </View>
-        </GlassView>
+        {!isAdmin && (
+          <GlassView
+            style={[
+              styles.infoCard,
+              Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+            ]}
+            glassEffectStyle="regular"
+          >
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
+                Current Plan:
+              </Text>
+              <Text style={[styles.infoValue, { color: theme.colors.text }]}>
+                {subscriptionPlan === 'free' ? 'Free' : 'Pro'}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
+                Businesses:
+              </Text>
+              <Text style={[styles.infoValue, { color: theme.colors.text }]}>
+                {currentBusinessCount} / {businessLimit}
+              </Text>
+            </View>
+          </GlassView>
+        )}
 
         {/* Progress Indicator */}
         <View style={styles.progressContainer}>
@@ -504,6 +528,21 @@ const styles = StyleSheet.create({
   },
   scrollContentWithTabBar: {
     paddingBottom: 100,
+  },
+  adminBadge: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#FF3B30',
+  },
+  adminBadgeText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   warningCard: {
     marginHorizontal: 16,
