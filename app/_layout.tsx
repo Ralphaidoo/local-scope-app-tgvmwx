@@ -1,4 +1,5 @@
 
+
 import { useNetworkState } from "expo-network";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
@@ -84,6 +85,13 @@ export default function RootLayout() {
                   }} 
                 />
                 <Stack.Screen 
+                  name="bookings" 
+                  options={{ 
+                    presentation: 'card',
+                    headerShown: false,
+                  }} 
+                />
+                <Stack.Screen 
                   name="orders" 
                   options={{ 
                     presentation: 'card',
@@ -120,6 +128,34 @@ export default function RootLayout() {
                 />
                 <Stack.Screen 
                   name="checkout" 
+                  options={{ 
+                    presentation: 'card',
+                    headerShown: false,
+                  }} 
+                />
+                <Stack.Screen 
+                  name="settings" 
+                  options={{ 
+                    presentation: 'card',
+                    headerShown: false,
+                  }} 
+                />
+                <Stack.Screen 
+                  name="notifications" 
+                  options={{ 
+                    presentation: 'card',
+                    headerShown: false,
+                  }} 
+                />
+                <Stack.Screen 
+                  name="subscription" 
+                  options={{ 
+                    presentation: 'card',
+                    headerShown: false,
+                  }} 
+                />
+                <Stack.Screen 
+                  name="payment-methods" 
                   options={{ 
                     presentation: 'card',
                     headerShown: false,
