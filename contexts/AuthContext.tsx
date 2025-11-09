@@ -56,7 +56,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (_event === 'SIGNED_IN' || _event === 'USER_UPDATED') {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
-        await loadUserProfile(session.user.id, session.user.email || '');
+        
+        // FIXED: Fetch profile using user_id and normalize user_type to userType
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .single();
+        
+        if (!error && data) {
+          console.log('Profile data fetched in auth listener:', data);
+          
+          // Map user_type to userType for consistent access in JSX
+          const userData: User = {
+            id: data.id,
+            email: data.email || session.user.email || '',
+            fullName: data.full_name || '',
+            userType: data.user_type || 'customer', // Normalized field
+            phone: data.phone || undefined,
+            createdAt: data.created_at || new Date().toISOString(),
+            subscriptionPlan: (data.subscription_plan as SubscriptionPlan) || 'free',
+            businessListingCount: data.business_listing_count || 0,
+          };
+          
+          console.log('Setting user from auth listener with userType:', userData.userType);
+          setUser(userData);
+        } else {
+          console.log('Error fetching profile in auth listener:', error);
+          // Fallback to loading profile with retry logic
+          await loadUserProfile(session.user.id, session.user.email || '');
+        }
       } else {
         setUser(null);
         setIsLoading(false);
@@ -76,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const timestamp = Date.now();
         console.log('Force refresh with timestamp:', timestamp);
         
+        // FIXED: Query using user_id instead of id
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('*')
@@ -96,7 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             full_name: profile.full_name
           });
           
-          // Map user_type to userType for consistent access in JSX
+          // FIXED: Map user_type to userType for consistent access in JSX
           const actualUserType: UserType = profile.user_type || 'customer';
           
           console.log('User type from profile:', actualUserType);
@@ -135,6 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let error = null;
 
       while (retries > 0 && !profile) {
+        // FIXED: Query using user_id instead of id
         const result = await supabase
           .from('profiles')
           .select('*')
@@ -197,7 +228,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           full_name: profile.full_name
         });
         
-        // Map user_type to userType for consistent access in JSX
+        // FIXED: Map user_type to userType for consistent access in JSX
         const actualUserType: UserType = profile.user_type || 'customer';
         
         console.log('User type from profile:', actualUserType);
@@ -279,7 +310,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!error && data) {
       console.log('Profile data fetched:', data);
       
-      // Map user_type to userType for consistent access in JSX
+      // FIXED: Map user_type to userType for consistent access in JSX
       const actualUserType: UserType = data.user_type || 'customer';
       
       const userData: User = {
@@ -474,7 +505,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const canAddBusiness = (): boolean => {
     if (!user) return false;
     
-    // Admin users can always add businesses (using normalized userType field)
+    // FIXED: Admin users can always add businesses (using normalized userType field)
     if (user.userType === 'admin') {
       console.log('Admin user - can add business');
       return true;
@@ -492,7 +523,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const getBusinessLimit = (): number => {
     if (!user) return 0;
     
-    // Admin users have unlimited businesses (using normalized userType field)
+    // FIXED: Admin users have unlimited businesses (using normalized userType field)
     if (user.userType === 'admin') {
       console.log('Admin user - unlimited business limit');
       return 999;
