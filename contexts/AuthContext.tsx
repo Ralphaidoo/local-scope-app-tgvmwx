@@ -18,6 +18,7 @@ interface AuthContextType {
   canAddBusiness: () => boolean;
   getBusinessLimit: () => number;
   refreshUser: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -262,6 +263,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshProfile = async () => {
+    if (!session?.user?.id) {
+      console.log('No session available for refreshProfile');
+      return;
+    }
+
+    console.log('=== REFRESH PROFILE CALLED ===');
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single();
+    
+    if (!error && data) {
+      console.log('Profile data fetched:', data);
+      
+      // Convert the profile data to User format
+      const actualUserType: UserType = data.user_type || 'customer';
+      
+      const userData: User = {
+        id: data.id,
+        email: data.email || session.user.email || '',
+        fullName: data.full_name || '',
+        userType: actualUserType,
+        phone: data.phone || undefined,
+        createdAt: data.created_at || new Date().toISOString(),
+        subscriptionPlan: (data.subscription_plan as SubscriptionPlan) || 'free',
+        businessListingCount: data.business_listing_count || 0,
+      };
+      
+      console.log('Setting user from refreshProfile:', userData);
+      setUser(userData);
+    } else {
+      console.log('Error refreshing profile:', error);
+    }
+  };
+
   const login = async (email: string, password: string) => {
     try {
       console.log('Attempting login for:', email);
@@ -482,6 +520,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         canAddBusiness,
         getBusinessLimit,
         refreshUser,
+        refreshProfile,
       }}
     >
       {children}
