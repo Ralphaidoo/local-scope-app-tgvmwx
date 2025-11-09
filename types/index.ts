@@ -1,6 +1,6 @@
 
 export type UserType = 'customer' | 'business_user' | 'admin';
-export type SubscriptionPlan = 'free' | 'pro';
+export type SubscriptionPlan = 'free' | 'pro' | 'paid';
 export type SubscriptionStatus = 'active' | 'inactive' | 'trial' | 'expired';
 
 export interface User {
