@@ -68,8 +68,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Loading user profile for:', userId, 'Force refresh:', forceRefresh);
       
+      if (forceRefresh) {
+        // When force refreshing, directly fetch from database without retries
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        if (error) {
+          console.log('Error force refreshing profile:', error);
+          throw error;
+        }
+
+        if (profile) {
+          console.log('Profile force refreshed successfully:', {
+            id: profile.id,
+            email: profile.email,
+            user_type: profile.user_type,
+            full_name: profile.full_name
+          });
+          
+          const userData: User = {
+            id: profile.id,
+            email: profile.email || userEmail,
+            fullName: profile.full_name || '',
+            userType: (profile.user_type as UserType) || 'customer',
+            phone: profile.phone || undefined,
+            createdAt: profile.created_at || new Date().toISOString(),
+            subscriptionPlan: (profile.subscription_plan as SubscriptionPlan) || 'free',
+            businessListingCount: profile.business_listing_count || 0,
+          };
+          
+          console.log('Setting refreshed user data with userType:', userData.userType);
+          setUser(userData);
+          setIsLoading(false);
+          return;
+        }
+      }
+      
       // Retry logic for profile loading (in case trigger hasn't completed yet)
-      let retries = forceRefresh ? 1 : 5;
+      let retries = 5;
       let profile = null;
       let error = null;
 
@@ -88,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('Profile not found, retrying...', retries);
           
           // If this is the last retry, try to create the profile manually
-          if (retries === 1 && !forceRefresh) {
+          if (retries === 1) {
             console.log('Creating profile manually as fallback');
             try {
               const { data: newProfile, error: createError } = await supabase
@@ -114,9 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
           
-          if (!forceRefresh) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
+          await new Promise(resolve => setTimeout(resolve, 1000));
           retries--;
         } else {
           break;
