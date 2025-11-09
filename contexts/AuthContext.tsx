@@ -96,18 +96,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             full_name: profile.full_name
           });
           
-          // Both role and user_type should now be in sync thanks to the trigger
-          // Use user_type as the primary source
+          // Map user_type to userType for consistent access in JSX
           const actualUserType: UserType = profile.user_type || 'customer';
           
           console.log('User type from profile:', actualUserType);
-          console.log('Is admin check (user.user_type === admin):', actualUserType === 'admin');
+          console.log('Is admin check (user.userType === admin):', actualUserType === 'admin');
           
           const userData: User = {
             id: profile.id,
             email: profile.email || userEmail,
             fullName: profile.full_name || '',
-            userType: actualUserType,
+            userType: actualUserType, // Normalized field
             phone: profile.phone || undefined,
             createdAt: profile.created_at || new Date().toISOString(),
             subscriptionPlan: (profile.subscription_plan as SubscriptionPlan) || 'free',
@@ -198,18 +197,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           full_name: profile.full_name
         });
         
-        // Both role and user_type should now be in sync thanks to the trigger
-        // Use user_type as the primary source
+        // Map user_type to userType for consistent access in JSX
         const actualUserType: UserType = profile.user_type || 'customer';
         
         console.log('User type from profile:', actualUserType);
-        console.log('Is admin check (user.user_type === admin):', actualUserType === 'admin');
+        console.log('Is admin check (user.userType === admin):', actualUserType === 'admin');
         
         const userData: User = {
           id: profile.id,
           email: profile.email || userEmail,
           fullName: profile.full_name || '',
-          userType: actualUserType,
+          userType: actualUserType, // Normalized field
           phone: profile.phone || undefined,
           createdAt: profile.created_at || new Date().toISOString(),
           subscriptionPlan: (profile.subscription_plan as SubscriptionPlan) || 'free',
@@ -270,23 +268,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     console.log('=== REFRESH PROFILE CALLED ===');
+    
+    // FIXED: Query using user_id instead of id
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('user_id', session.user.id)
       .single();
     
     if (!error && data) {
       console.log('Profile data fetched:', data);
       
-      // Convert the profile data to User format
+      // Map user_type to userType for consistent access in JSX
       const actualUserType: UserType = data.user_type || 'customer';
       
       const userData: User = {
         id: data.id,
         email: data.email || session.user.email || '',
         fullName: data.full_name || '',
-        userType: actualUserType,
+        userType: actualUserType, // Normalized field
         phone: data.phone || undefined,
         createdAt: data.created_at || new Date().toISOString(),
         subscriptionPlan: (data.subscription_plan as SubscriptionPlan) || 'free',
@@ -474,7 +474,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const canAddBusiness = (): boolean => {
     if (!user) return false;
     
-    // Admin users can always add businesses (user.user_type === 'admin')
+    // Admin users can always add businesses (using normalized userType field)
     if (user.userType === 'admin') {
       console.log('Admin user - can add business');
       return true;
@@ -492,7 +492,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const getBusinessLimit = (): number => {
     if (!user) return 0;
     
-    // Admin users have unlimited businesses (user.user_type === 'admin')
+    // Admin users have unlimited businesses (using normalized userType field)
     if (user.userType === 'admin') {
       console.log('Admin user - unlimited business limit');
       return 999;
