@@ -46,6 +46,12 @@ export default function TabLayout() {
       return [
         ...baseTabs,
         {
+          name: 'dashboard',
+          route: '/(tabs)/dashboard',
+          icon: 'chart.bar.fill',
+          label: 'Dashboard',
+        },
+        {
           name: 'admin',
           route: '/(tabs)/admin',
           icon: 'gear',

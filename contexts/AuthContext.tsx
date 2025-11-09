@@ -248,7 +248,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const canAddBusiness = (): boolean => {
-    if (!user || user.userType !== 'business_user') return false;
+    if (!user) return false;
+    
+    // Admin users can always add businesses
+    if (user.userType === 'admin') return true;
+    
+    // Business users need to check their limit
+    if (user.userType !== 'business_user') return false;
     
     const limit = getBusinessLimit();
     const currentCount = user.businessListingCount || 0;
@@ -257,7 +263,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const getBusinessLimit = (): number => {
-    if (!user || user.userType !== 'business_user') return 0;
+    if (!user) return 0;
+    
+    // Admin users have unlimited businesses
+    if (user.userType === 'admin') return 999;
+    
+    // Business users have limits based on their plan
+    if (user.userType !== 'business_user') return 0;
     
     const plan = user.subscriptionPlan || 'free';
     return plan === 'pro' ? 5 : 2;

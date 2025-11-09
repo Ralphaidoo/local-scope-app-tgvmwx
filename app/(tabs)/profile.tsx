@@ -58,6 +58,8 @@ export default function ProfileScreen() {
   const businessLimit = getBusinessLimit();
   const currentBusinessCount = user?.businessListingCount || 0;
   const subscriptionPlan = user?.subscriptionPlan || 'free';
+  const isAdmin = user?.userType === 'admin';
+  const isBusinessUser = user?.userType === 'business_user';
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
@@ -98,8 +100,36 @@ export default function ProfileScreen() {
           </View>
         </GlassView>
 
-        {/* Add Business Button (for business users) */}
-        {user?.userType === 'business_user' && (
+        {/* Admin Portal Link (for admin users) */}
+        {isAdmin && (
+          <Pressable onPress={() => router.push('/(tabs)/admin')}>
+            <GlassView
+              style={[
+                styles.adminPortalCard,
+                Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+              ]}
+              glassEffectStyle="regular"
+            >
+              <View style={styles.adminPortalContent}>
+                <View style={[styles.adminPortalIcon, { backgroundColor: '#FF9500' }]}>
+                  <IconSymbol name="gear" color="#fff" size={24} />
+                </View>
+                <View style={styles.adminPortalText}>
+                  <Text style={[styles.adminPortalTitle, { color: theme.colors.text }]}>
+                    Admin Portal
+                  </Text>
+                  <Text style={[styles.adminPortalSubtitle, { color: theme.dark ? '#98989D' : '#666' }]}>
+                    Manage users, businesses, and platform settings
+                  </Text>
+                </View>
+              </View>
+              <IconSymbol name="chevron.right" color={theme.dark ? '#98989D' : '#666'} size={20} />
+            </GlassView>
+          </Pressable>
+        )}
+
+        {/* Add Business Button (for business users and admins) */}
+        {(isBusinessUser || isAdmin) && (
           <Pressable onPress={handleAddBusiness}>
             <GlassView
               style={[
@@ -126,8 +156,8 @@ export default function ProfileScreen() {
           </Pressable>
         )}
 
-        {/* Subscription Card (for business users) */}
-        {user?.userType === 'business_user' && (
+        {/* Subscription Card (for business users and admins) */}
+        {(isBusinessUser || isAdmin) && (
           <GlassView
             style={[
               styles.subscriptionCard,
@@ -138,25 +168,27 @@ export default function ProfileScreen() {
             <View style={styles.subscriptionHeader}>
               <View style={styles.subscriptionInfo}>
                 <Text style={[styles.subscriptionLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
-                  Subscription Plan
+                  {isAdmin ? 'Admin Access' : 'Subscription Plan'}
                 </Text>
                 <View style={styles.subscriptionPlanRow}>
                   <Text style={[styles.subscriptionPlan, { color: theme.colors.text }]}>
-                    {subscriptionPlan === 'free' ? 'Free' : 'Pro'}
+                    {isAdmin ? 'Full Access' : subscriptionPlan === 'free' ? 'Free' : 'Pro'}
                   </Text>
-                  {subscriptionPlan === 'pro' && (
+                  {(isAdmin || subscriptionPlan === 'pro') && (
                     <IconSymbol name="star.fill" color="#FFD700" size={20} />
                   )}
                 </View>
               </View>
-              <Pressable
-                style={[styles.upgradeButton, { backgroundColor: subscriptionPlan === 'free' ? '#007AFF' : theme.dark ? '#333' : '#ddd' }]}
-                onPress={() => router.push('/subscription')}
-              >
-                <Text style={[styles.upgradeButtonText, { color: subscriptionPlan === 'free' ? '#fff' : theme.colors.text }]}>
-                  {subscriptionPlan === 'free' ? 'Upgrade' : 'Manage'}
-                </Text>
-              </Pressable>
+              {!isAdmin && (
+                <Pressable
+                  style={[styles.upgradeButton, { backgroundColor: subscriptionPlan === 'free' ? '#007AFF' : theme.dark ? '#333' : '#ddd' }]}
+                  onPress={() => router.push('/subscription')}
+                >
+                  <Text style={[styles.upgradeButtonText, { color: subscriptionPlan === 'free' ? '#fff' : theme.colors.text }]}>
+                    {subscriptionPlan === 'free' ? 'Upgrade' : 'Manage'}
+                  </Text>
+                </Pressable>
+              )}
             </View>
             
             <View style={styles.subscriptionStats}>
@@ -170,7 +202,7 @@ export default function ProfileScreen() {
               </View>
               <View style={styles.statItem}>
                 <Text style={[styles.statValue, { color: theme.colors.text }]}>
-                  {subscriptionPlan === 'pro' ? 'Enabled' : 'Disabled'}
+                  {(isAdmin || subscriptionPlan === 'pro') ? 'Enabled' : 'Disabled'}
                 </Text>
                 <Text style={[styles.statLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
                   Bookings & Sales
@@ -178,11 +210,20 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            {subscriptionPlan === 'free' && (
+            {!isAdmin && subscriptionPlan === 'free' && (
               <View style={styles.upgradePrompt}>
                 <IconSymbol name="star.circle.fill" color="#FFD700" size={24} />
                 <Text style={[styles.upgradePromptText, { color: theme.colors.text }]}>
                   Upgrade to Pro to unlock bookings, product sales, and list up to 5 businesses!
+                </Text>
+              </View>
+            )}
+
+            {isAdmin && (
+              <View style={[styles.upgradePrompt, { backgroundColor: 'rgba(255, 149, 0, 0.1)' }]}>
+                <IconSymbol name="checkmark.shield.fill" color="#FF9500" size={24} />
+                <Text style={[styles.upgradePromptText, { color: theme.colors.text }]}>
+                  As an admin, you have full access to all business features including unlimited listings, bookings, and sales.
                 </Text>
               </View>
             )}
@@ -351,6 +392,39 @@ const styles = StyleSheet.create({
   userTypeText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  adminPortalCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  adminPortalContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  adminPortalIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  adminPortalText: {
+    flex: 1,
+  },
+  adminPortalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  adminPortalSubtitle: {
+    fontSize: 12,
   },
   addBusinessCard: {
     marginHorizontal: 16,

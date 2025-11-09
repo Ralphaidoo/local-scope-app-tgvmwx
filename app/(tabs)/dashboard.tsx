@@ -30,7 +30,7 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    if (user?.userType === 'business') {
+    if (user?.userType === 'business_user' || user?.userType === 'admin') {
       loadDashboardData();
     }
   }, [user]);
@@ -128,13 +128,13 @@ export default function DashboardScreen() {
     loadDashboardData();
   };
 
-  if (user?.userType !== 'business') {
+  if (user?.userType !== 'business_user' && user?.userType !== 'admin') {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
         <View style={styles.notAuthorized}>
           <IconSymbol name="exclamationmark.triangle" color="#FF9500" size={64} />
           <Text style={[styles.notAuthorizedText, { color: theme.colors.text }]}>
-            This section is only available for business owners
+            This section is only available for business owners and admins
           </Text>
         </View>
       </SafeAreaView>
@@ -170,9 +170,25 @@ export default function DashboardScreen() {
         <View style={styles.header}>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Dashboard</Text>
           <Text style={[styles.headerSubtitle, { color: theme.dark ? '#98989D' : '#666' }]}>
-            Welcome back, {user.fullName.split(' ')[0]}!
+            Welcome back, {user?.fullName?.split(' ')[0] || 'User'}!
           </Text>
         </View>
+
+        {/* Admin Badge */}
+        {user?.userType === 'admin' && (
+          <GlassView
+            style={[
+              styles.adminBadge,
+              Platform.OS !== 'ios' && { backgroundColor: 'rgba(255, 149, 0, 0.1)' }
+            ]}
+            glassEffectStyle="regular"
+          >
+            <IconSymbol name="checkmark.shield.fill" color="#FF9500" size={24} />
+            <Text style={[styles.adminBadgeText, { color: theme.colors.text }]}>
+              Admin Dashboard - Full Access
+            </Text>
+          </GlassView>
+        )}
 
         {/* Business Count Info */}
         {businesses.length > 0 && (
@@ -339,6 +355,20 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 16,
+  },
+  adminBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FF9500',
+  },
+  adminBadgeText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   infoCard: {
     padding: 16,
