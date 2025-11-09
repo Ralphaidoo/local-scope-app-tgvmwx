@@ -160,7 +160,7 @@ export default function FloatingTabBar({
                 <View style={styles.tabContent}>
                   <IconSymbol
                     name={tab.icon}
-                    size={24}
+                    size={22}
                     color={isActive ? theme.colors.primary : (theme.dark ? '#98989D' : '#8E8E93')}
                   />
                   <Text
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   },
   tabsContainer: {
     flexDirection: 'row',
-    height: 60,
+    height: 50,
     alignItems: 'center',
     width: '100%',
   },
@@ -211,16 +211,16 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   tabContent: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: 1,
   },
   tabLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
-    marginTop: 2,
+    marginTop: 1,
   },
 });
