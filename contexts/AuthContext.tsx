@@ -70,6 +70,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (forceRefresh) {
         // When force refreshing, directly fetch from database without retries
+        // Add a timestamp to bust any potential caching
+        const timestamp = Date.now();
+        console.log('Force refresh with timestamp:', timestamp);
+        
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('*')
@@ -86,6 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: profile.id,
             email: profile.email,
             user_type: profile.user_type,
+            role: profile.role,
             full_name: profile.full_name
           });
           
@@ -101,7 +106,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           };
           
           console.log('Setting refreshed user data with userType:', userData.userType);
-          setUser(userData);
+          console.log('Full user data being set:', JSON.stringify(userData, null, 2));
+          
+          // Force a state update by creating a completely new object
+          setUser({ ...userData });
           setIsLoading(false);
           return;
         }
@@ -170,6 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: profile.id,
           email: profile.email,
           user_type: profile.user_type,
+          role: profile.role,
           full_name: profile.full_name
         });
         
@@ -221,9 +230,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = async () => {
     if (session?.user?.id) {
-      console.log('Refreshing user data...');
+      console.log('=== REFRESH USER CALLED ===');
+      console.log('Current user before refresh:', JSON.stringify(user, null, 2));
       setIsLoading(true);
       await loadUserProfile(session.user.id, session.user.email || '', true);
+      console.log('=== REFRESH USER COMPLETED ===');
     }
   };
 

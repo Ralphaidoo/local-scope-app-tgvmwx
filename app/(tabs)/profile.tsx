@@ -13,6 +13,15 @@ export default function ProfileScreen() {
   const { user, logout, getBusinessLimit, canAddBusiness, isLoading, refreshUser } = useAuth();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
 
+  // Log user data whenever it changes
+  React.useEffect(() => {
+    console.log('=== PROFILE SCREEN USER DATA ===');
+    console.log('User:', JSON.stringify(user, null, 2));
+    console.log('User Type:', user?.userType);
+    console.log('Is Admin:', user?.userType === 'admin');
+    console.log('================================');
+  }, [user]);
+
   const handleLogout = () => {
     Alert.alert(
       'Logout',
@@ -38,8 +47,11 @@ export default function ProfileScreen() {
 
   const handleRefreshProfile = async () => {
     try {
+      console.log('=== REFRESH BUTTON CLICKED ===');
+      console.log('User before refresh:', JSON.stringify(user, null, 2));
       setIsRefreshing(true);
       await refreshUser();
+      console.log('User after refresh:', JSON.stringify(user, null, 2));
       Alert.alert('Success', 'Profile refreshed successfully!');
     } catch (error) {
       console.log('Refresh error:', error);
@@ -115,7 +127,14 @@ export default function ProfileScreen() {
   const isAdmin = user?.userType === 'admin';
   const isBusinessUser = user?.userType === 'business_user';
 
-  console.log('Profile Screen - User Type:', user?.userType, 'Is Admin:', isAdmin);
+  console.log('Profile Screen Render - User Type:', user?.userType, 'Is Admin:', isAdmin);
+
+  // Determine the display text for user type
+  const getUserTypeDisplay = () => {
+    if (user.userType === 'admin') return 'Admin';
+    if (user.userType === 'business_user') return 'Business Owner';
+    return 'Customer';
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
@@ -163,9 +182,12 @@ export default function ProfileScreen() {
           <Text style={[styles.userEmail, { color: theme.dark ? '#98989D' : '#666' }]}>
             {user.email || 'user@example.com'}
           </Text>
-          <View style={styles.userTypeBadge}>
+          <View style={[
+            styles.userTypeBadge,
+            { backgroundColor: isAdmin ? 'rgba(255, 59, 48, 0.2)' : 'rgba(0, 122, 255, 0.2)' }
+          ]}>
             <Text style={[styles.userTypeText, { color: theme.colors.text }]}>
-              {user.userType === 'customer' ? 'Customer' : user.userType === 'business_user' ? 'Business Owner' : 'Admin'}
+              {getUserTypeDisplay()}
             </Text>
           </View>
           
@@ -404,6 +426,22 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
 
+        {/* Debug Info (only visible in development) */}
+        {__DEV__ && (
+          <View style={styles.debugSection}>
+            <Text style={[styles.debugTitle, { color: theme.colors.text }]}>Debug Info</Text>
+            <Text style={[styles.debugText, { color: theme.dark ? '#98989D' : '#666' }]}>
+              User Type: {user.userType}
+            </Text>
+            <Text style={[styles.debugText, { color: theme.dark ? '#98989D' : '#666' }]}>
+              Is Admin: {isAdmin ? 'Yes' : 'No'}
+            </Text>
+            <Text style={[styles.debugText, { color: theme.dark ? '#98989D' : '#666' }]}>
+              Email: {user.email}
+            </Text>
+          </View>
+        )}
+
         {/* App Info */}
         <View style={styles.appInfo}>
           <Text style={[styles.appInfoText, { color: theme.dark ? '#666' : '#999' }]}>
@@ -510,7 +548,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: 'rgba(0, 122, 255, 0.2)',
     marginBottom: 16,
   },
   userTypeText: {
@@ -682,6 +719,22 @@ const styles = StyleSheet.create({
   menuItemText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  debugSection: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 149, 0, 0.1)',
+  },
+  debugTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  debugText: {
+    fontSize: 14,
+    marginBottom: 4,
   },
   appInfo: {
     alignItems: 'center',
