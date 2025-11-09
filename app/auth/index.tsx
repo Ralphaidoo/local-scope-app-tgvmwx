@@ -53,8 +53,13 @@ export default function AuthScreen() {
       }
     } catch (err: any) {
       console.log('Auth error:', err);
-      const errorMessage = err?.message || 'Authentication failed. Please try again.';
-      setError(errorMessage);
+      // Error is already shown in Alert by the auth context
+      // Only set local error if it wasn't shown
+      if (!err?.message?.includes('Email not confirmed') && 
+          !err?.message?.includes('Invalid login credentials')) {
+        const errorMessage = err?.message || 'Authentication failed. Please try again.';
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }

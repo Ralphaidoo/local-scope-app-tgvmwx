@@ -104,7 +104,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.log('Login error:', error);
-        Alert.alert('Login Failed', error.message || 'Invalid email or password');
+        
+        // Check for specific error messages
+        if (error.message.includes('Email not confirmed')) {
+          Alert.alert(
+            'Email Not Verified',
+            'Please check your email and click the verification link before signing in. Check your spam folder if you don\'t see it.',
+            [{ text: 'OK' }]
+          );
+        } else if (error.message.includes('Invalid login credentials')) {
+          Alert.alert('Login Failed', 'Invalid email or password. Please try again.');
+        } else {
+          Alert.alert('Login Failed', error.message || 'An error occurred during login.');
+        }
         throw error;
       }
 
@@ -167,11 +179,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Show email verification message
         Alert.alert(
           'Verify Your Email',
-          'Please check your email and click the verification link to complete your registration.',
+          'We\'ve sent a verification link to your email address. Please check your inbox (and spam folder) and click the link to verify your account before signing in.',
           [{ text: 'OK' }]
         );
 
-        await loadUserProfile(authData.user.id);
+        // Don't load the profile yet since email is not verified
+        // await loadUserProfile(authData.user.id);
       }
     } catch (error: any) {
       console.log('Signup error:', error);

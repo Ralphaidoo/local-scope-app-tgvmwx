@@ -32,10 +32,12 @@ export default function OnboardingScreen() {
 
     try {
       await signup(email, password, fullName, selectedType);
-      // After successful signup, redirect to home
-      router.replace('/(tabs)/(home)/');
+      // After successful signup, redirect to auth screen to sign in
+      // The signup function will show an alert about email verification
+      router.replace('/auth');
     } catch (err: any) {
       console.log('Signup error:', err);
+      // Error is already shown in Alert by the auth context
       setError(err?.message || 'Failed to create account. Please try again.');
     } finally {
       setLoading(false);
@@ -132,7 +134,7 @@ export default function OnboardingScreen() {
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.continueButtonText}>Continue</Text>
+            <Text style={styles.continueButtonText}>Create Account</Text>
           )}
         </Pressable>
 
