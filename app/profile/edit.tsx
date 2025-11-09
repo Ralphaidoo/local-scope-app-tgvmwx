@@ -19,6 +19,8 @@ export default function EditProfileScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSave = async () => {
+    console.log('Save button pressed');
+    
     if (!fullName.trim()) {
       Alert.alert('Error', 'Please enter your full name');
       return;
@@ -42,6 +44,7 @@ export default function EditProfileScreen() {
       const emailChanged = email.trim() !== user?.email;
       
       if (emailChanged) {
+        console.log('Email changed, updating through Supabase Auth');
         // Update email through Supabase Auth
         const { error: emailError } = await supabase.auth.updateUser({
           email: email.trim(),
@@ -63,6 +66,7 @@ export default function EditProfileScreen() {
       }
 
       // Update profile information
+      console.log('Updating profile information');
       await updateProfile({
         fullName: fullName.trim(),
         phone: phone.trim() || undefined,
@@ -96,7 +100,11 @@ export default function EditProfileScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
+        <Pressable 
+          onPress={() => router.back()} 
+          style={styles.backButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <IconSymbol name="chevron.left" color={theme.colors.text} size={24} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Edit Profile</Text>
@@ -106,6 +114,7 @@ export default function EditProfileScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <GlassView
           style={[
@@ -210,20 +219,25 @@ export default function EditProfileScreen() {
           </View>
         </GlassView>
 
-        {/* Save Button */}
-        <Pressable
-          style={[
-            styles.saveButton,
-            { backgroundColor: '#007AFF' },
-            isLoading && styles.saveButtonDisabled
-          ]}
-          onPress={handleSave}
-          disabled={isLoading}
-        >
-          <Text style={styles.saveButtonText}>
-            {isLoading ? 'Saving...' : 'Save Changes'}
-          </Text>
-        </Pressable>
+        {/* Save Button - Now outside GlassView for better touch handling */}
+        <View style={styles.buttonContainer}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.saveButton,
+              { 
+                backgroundColor: isLoading ? '#999' : '#007AFF',
+                opacity: pressed ? 0.8 : 1,
+              }
+            ]}
+            onPress={handleSave}
+            disabled={isLoading}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={styles.saveButtonText}>
+              {isLoading ? 'Saving...' : 'Save Changes'}
+            </Text>
+          </Pressable>
+        </View>
 
         {/* Info Card */}
         <GlassView
@@ -238,6 +252,9 @@ export default function EditProfileScreen() {
             Your profile information is used to personalize your experience and communicate with businesses. Email changes require verification for security.
           </Text>
         </GlassView>
+
+        {/* Extra padding at bottom to ensure content is not hidden by tab bar */}
+        <View style={{ height: 120 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -269,7 +286,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 100,
   },
   formCard: {
     padding: 20,
@@ -317,15 +333,23 @@ const styles = StyleSheet.create({
     marginTop: 4,
     lineHeight: 16,
   },
+  buttonContainer: {
+    marginBottom: 16,
+    zIndex: 10,
+  },
   saveButton: {
     height: 52,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   saveButtonText: {
     color: '#fff',
@@ -338,6 +362,7 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 16,
     borderRadius: 12,
+    marginBottom: 16,
   },
   infoText: {
     flex: 1,
