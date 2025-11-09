@@ -7,12 +7,14 @@ import { router } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
 import { GlassView } from 'expo-glass-effect';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/app/integrations/supabase/client';
 
 export default function EditProfileScreen() {
   const theme = useTheme();
   const { user, updateProfile } = useAuth();
   
   const [fullName, setFullName] = useState(user?.fullName || '');
+  const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -22,23 +24,67 @@ export default function EditProfileScreen() {
       return;
     }
 
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email address');
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
     setIsLoading(true);
     try {
+      // Check if email has changed
+      const emailChanged = email.trim() !== user?.email;
+      
+      if (emailChanged) {
+        // Update email through Supabase Auth
+        const { error: emailError } = await supabase.auth.updateUser({
+          email: email.trim(),
+        });
+
+        if (emailError) {
+          console.log('Error updating email:', emailError);
+          Alert.alert('Error', emailError.message || 'Failed to update email. Please try again.');
+          setIsLoading(false);
+          return;
+        }
+
+        // Show confirmation message about email verification
+        Alert.alert(
+          'Email Update Initiated',
+          'A confirmation email has been sent to your new email address. Please check your inbox and click the confirmation link to complete the email change. Your old email will remain active until you confirm the new one.',
+          [{ text: 'OK' }]
+        );
+      }
+
+      // Update profile information
       await updateProfile({
         fullName: fullName.trim(),
         phone: phone.trim() || undefined,
       });
       
-      Alert.alert(
-        'Success',
-        'Your profile has been updated successfully!',
-        [
-          {
-            text: 'OK',
-            onPress: () => router.back(),
-          },
-        ]
-      );
+      if (!emailChanged) {
+        Alert.alert(
+          'Success',
+          'Your profile has been updated successfully!',
+          [
+            {
+              text: 'OK',
+              onPress: () => router.back(),
+            },
+          ]
+        );
+      } else {
+        // If email changed, don't navigate back immediately so user can see the message
+        setTimeout(() => {
+          router.back();
+        }, 2000);
+      }
     } catch (error: any) {
       console.log('Error updating profile:', error);
       Alert.alert('Error', error.message || 'Failed to update profile. Please try again.');
@@ -99,23 +145,29 @@ export default function EditProfileScreen() {
             />
           </View>
 
-          {/* Email Input (Read-only) */}
+          {/* Email Input */}
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: theme.colors.text }]}>Email</Text>
-            <View style={[
-              styles.input,
-              styles.readOnlyInput,
-              {
-                backgroundColor: theme.dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
-                borderColor: theme.dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-              }
-            ]}>
-              <Text style={[styles.readOnlyText, { color: theme.dark ? '#666' : '#999' }]}>
-                {user?.email || 'user@example.com'}
-              </Text>
-            </View>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  color: theme.colors.text,
+                  backgroundColor: theme.dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                  borderColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                }
+              ]}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="Enter your email"
+              placeholderTextColor={theme.dark ? '#666' : '#999'}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!isLoading}
+            />
             <Text style={[styles.hint, { color: theme.dark ? '#666' : '#999' }]}>
-              Email cannot be changed. Contact support if you need to update your email.
+              Changing your email will require verification. You&apos;ll receive a confirmation link at your new email address.
             </Text>
           </View>
 
@@ -183,7 +235,7 @@ export default function EditProfileScreen() {
         >
           <IconSymbol name="info.circle" color="#007AFF" size={24} />
           <Text style={[styles.infoText, { color: theme.colors.text }]}>
-            Your profile information is used to personalize your experience and communicate with businesses.
+            Your profile information is used to personalize your experience and communicate with businesses. Email changes require verification for security.
           </Text>
         </GlassView>
       </ScrollView>
@@ -263,6 +315,7 @@ const styles = StyleSheet.create({
   hint: {
     fontSize: 12,
     marginTop: 4,
+    lineHeight: 16,
   },
   saveButton: {
     height: 52,
