@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Platform, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@react-navigation/native';
@@ -7,6 +7,16 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { GlassView } from 'expo-glass-effect';
 import { router } from 'expo-router';
 import { useCart } from '@/contexts/CartContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+interface PaymentMethod {
+  id: string;
+  type: 'card' | 'bank' | 'paypal';
+  cardBrand?: 'visa' | 'mastercard' | 'amex';
+  last4: string;
+  holderName: string;
+  isDefault: boolean;
+}
 
 export default function CheckoutScreen() {
   const theme = useTheme();
@@ -14,47 +24,125 @@ export default function CheckoutScreen() {
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [promoCode, setPromoCode] = useState('');
   const [discount, setDiscount] = useState(0);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
 
   const subtotal = getTotal();
   const deliveryFee = 2.50;
   const total = subtotal + deliveryFee - discount;
+
+  useEffect(() => {
+    loadPaymentMethods();
+  }, []);
+
+  const loadPaymentMethods = async () => {
+    try {
+      const savedMethods = await AsyncStorage.getItem('payment_methods');
+      if (savedMethods) {
+        const methods: PaymentMethod[] = JSON.parse(savedMethods);
+        setPaymentMethods(methods);
+        const defaultMethod = methods.find(m => m.isDefault);
+        if (defaultMethod) {
+          setSelectedPaymentMethod(defaultMethod);
+        } else if (methods.length > 0) {
+          setSelectedPaymentMethod(methods[0]);
+        }
+      }
+    } catch (error) {
+      console.log('Error loading payment methods:', error);
+    }
+  };
 
   const handleApplyPromo = () => {
     // Mock promo code validation
     if (promoCode.toUpperCase() === 'SAVE10') {
       setDiscount(subtotal * 0.1);
       Alert.alert('Success', '10% discount applied!');
+    } else if (promoCode.toUpperCase() === 'SAVE20') {
+      setDiscount(subtotal * 0.2);
+      Alert.alert('Success', '20% discount applied!');
     } else {
       Alert.alert('Error', 'Invalid promo code');
     }
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (!deliveryAddress.trim()) {
       Alert.alert('Error', 'Please enter a delivery address');
       return;
     }
 
-    console.log('Order placed:', {
-      items,
-      deliveryAddress,
-      promoCode,
-      total,
-    });
+    if (!selectedPaymentMethod) {
+      Alert.alert('Error', 'Please select a payment method');
+      return;
+    }
 
-    Alert.alert(
-      'Order Placed!',
-      'Your order has been placed successfully. You will receive a confirmation shortly.',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            clearCart();
-            router.replace('/orders');
+    try {
+      // Create order
+      const order = {
+        id: Date.now().toString(),
+        userId: '1',
+        items,
+        total,
+        status: 'pending',
+        paymentMethod: `${selectedPaymentMethod.cardBrand?.toUpperCase()} •••• ${selectedPaymentMethod.last4}`,
+        deliveryAddress,
+        promoCode: promoCode || undefined,
+        discount: discount > 0 ? discount : undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Save order
+      const savedOrders = await AsyncStorage.getItem('orders');
+      const orders = savedOrders ? JSON.parse(savedOrders) : [];
+      orders.unshift(order);
+      await AsyncStorage.setItem('orders', JSON.stringify(orders));
+
+      // Create notification
+      const savedNotifications = await AsyncStorage.getItem('notifications');
+      const notifications = savedNotifications ? JSON.parse(savedNotifications) : [];
+      notifications.unshift({
+        id: Date.now().toString(),
+        type: 'order',
+        title: 'Order Placed',
+        message: `Your order #${order.id.slice(-6)} has been placed successfully. Total: £${total.toFixed(2)}`,
+        read: false,
+        createdAt: new Date().toISOString(),
+        actionRoute: `/orders/${order.id}`,
+      });
+      await AsyncStorage.setItem('notifications', JSON.stringify(notifications));
+
+      console.log('Order placed:', order);
+
+      Alert.alert(
+        'Order Placed!',
+        'Your order has been placed successfully. You will receive a confirmation shortly.',
+        [
+          {
+            text: 'View Order',
+            onPress: () => {
+              clearCart();
+              router.replace(`/orders/${order.id}` as any);
+            },
           },
-        },
-      ]
-    );
+          {
+            text: 'Continue Shopping',
+            onPress: () => {
+              clearCart();
+              router.replace('/(tabs)/(home)');
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.log('Error placing order:', error);
+      Alert.alert('Error', 'Failed to place order. Please try again.');
+    }
+  };
+
+  const handleSelectPaymentMethod = () => {
+    router.push('/payment-methods' as any);
   };
 
   return (
@@ -115,7 +203,7 @@ export default function CheckoutScreen() {
                   color: theme.colors.text,
                 }
               ]}
-              placeholder="Enter code"
+              placeholder="Enter code (try SAVE10 or SAVE20)"
               placeholderTextColor={theme.dark ? '#666' : '#98989D'}
               value={promoCode}
               onChangeText={setPromoCode}
@@ -184,13 +272,22 @@ export default function CheckoutScreen() {
           glassEffectStyle="regular"
         >
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Payment Method</Text>
-          <View style={styles.paymentMethod}>
-            <IconSymbol name="creditcard.fill" color="#007AFF" size={24} />
-            <Text style={[styles.paymentText, { color: theme.colors.text }]}>
-              Visa ending in 4242
-            </Text>
-            <IconSymbol name="chevron.right" color={theme.dark ? '#98989D' : '#666'} size={20} />
-          </View>
+          {selectedPaymentMethod ? (
+            <Pressable style={styles.paymentMethod} onPress={handleSelectPaymentMethod}>
+              <IconSymbol name="creditcard.fill" color="#007AFF" size={24} />
+              <Text style={[styles.paymentText, { color: theme.colors.text }]}>
+                {selectedPaymentMethod.cardBrand?.toUpperCase()} ending in {selectedPaymentMethod.last4}
+              </Text>
+              <IconSymbol name="chevron.right" color={theme.dark ? '#98989D' : '#666'} size={20} />
+            </Pressable>
+          ) : (
+            <Pressable style={styles.addPaymentButton} onPress={handleSelectPaymentMethod}>
+              <IconSymbol name="plus.circle.fill" color="#007AFF" size={24} />
+              <Text style={[styles.addPaymentText, { color: '#007AFF' }]}>
+                Add Payment Method
+              </Text>
+            </Pressable>
+          )}
         </GlassView>
       </ScrollView>
 
@@ -293,6 +390,16 @@ const styles = StyleSheet.create({
   paymentText: {
     flex: 1,
     fontSize: 16,
+  },
+  addPaymentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+  },
+  addPaymentText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   footer: {
     position: 'absolute',

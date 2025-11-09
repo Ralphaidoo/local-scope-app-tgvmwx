@@ -6,9 +6,11 @@ import { useTheme } from '@react-navigation/native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { GlassView } from 'expo-glass-effect';
 import { mockBusinesses, mockServices } from '@/data/mockData';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Booking } from '@/types';
 
 export default function BookingScreen() {
-  const { businessId, serviceId } = useLocalSearchParams();
+  const { businessId, serviceId, reschedule, bookingId } = useLocalSearchParams();
   const theme = useTheme();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -22,22 +24,92 @@ export default function BookingScreen() {
     '15:00', '15:30', '16:00', '16:30', '17:00', '17:30',
   ];
 
-  const handleBooking = () => {
+  const handleBooking = async () => {
     if (!selectedTime) {
       Alert.alert('Error', 'Please select a time slot');
       return;
     }
 
-    Alert.alert(
-      'Booking Confirmed',
-      `Your appointment at ${business?.name} for ${service?.name} on ${selectedDate.toLocaleDateString()} at ${selectedTime} has been confirmed.`,
-      [
-        {
-          text: 'OK',
-          onPress: () => router.back(),
-        },
-      ]
-    );
+    try {
+      // Load existing bookings
+      const savedBookings = await AsyncStorage.getItem('bookings');
+      const bookings: Booking[] = savedBookings ? JSON.parse(savedBookings) : [];
+
+      if (reschedule === 'true' && bookingId) {
+        // Update existing booking
+        const updatedBookings = bookings.map(booking =>
+          booking.id === bookingId
+            ? {
+                ...booking,
+                date: selectedDate.toISOString().split('T')[0],
+                time: selectedTime,
+              }
+            : booking
+        );
+        await AsyncStorage.setItem('bookings', JSON.stringify(updatedBookings));
+        
+        Alert.alert(
+          'Booking Rescheduled',
+          `Your appointment has been rescheduled to ${selectedDate.toLocaleDateString()} at ${selectedTime}.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => router.push('/bookings'),
+            },
+          ]
+        );
+      } else {
+        // Create new booking
+        const newBooking: Booking = {
+          id: Date.now().toString(),
+          userId: '1', // In production, get from auth context
+          businessId: business?.id || '',
+          serviceId: service?.id || '',
+          serviceName: service?.name || '',
+          date: selectedDate.toISOString().split('T')[0],
+          time: selectedTime,
+          duration: service?.duration || 60,
+          price: service?.price || 0,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        };
+
+        bookings.push(newBooking);
+        await AsyncStorage.setItem('bookings', JSON.stringify(bookings));
+
+        // Create notification
+        const savedNotifications = await AsyncStorage.getItem('notifications');
+        const notifications = savedNotifications ? JSON.parse(savedNotifications) : [];
+        notifications.unshift({
+          id: Date.now().toString(),
+          type: 'booking',
+          title: 'Booking Confirmed',
+          message: `Your appointment at ${business?.name} for ${service?.name} on ${selectedDate.toLocaleDateString()} at ${selectedTime} has been confirmed.`,
+          read: false,
+          createdAt: new Date().toISOString(),
+          actionRoute: '/bookings',
+        });
+        await AsyncStorage.setItem('notifications', JSON.stringify(notifications));
+
+        Alert.alert(
+          'Booking Confirmed',
+          `Your appointment at ${business?.name} for ${service?.name} on ${selectedDate.toLocaleDateString()} at ${selectedTime} has been confirmed.`,
+          [
+            {
+              text: 'View Bookings',
+              onPress: () => router.push('/bookings'),
+            },
+            {
+              text: 'OK',
+              onPress: () => router.back(),
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      console.log('Error saving booking:', error);
+      Alert.alert('Error', 'Failed to save booking. Please try again.');
+    }
   };
 
   if (!business || !service) {
@@ -52,6 +124,16 @@ export default function BookingScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()}>
+          <IconSymbol name="chevron.left" color={theme.colors.text} size={24} />
+        </Pressable>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+          {reschedule === 'true' ? 'Reschedule Booking' : 'Book Service'}
+        </Text>
+        <View style={{ width: 24 }} />
+      </View>
+
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <GlassView
           style={[
@@ -157,7 +239,9 @@ export default function BookingScreen() {
           onPress={handleBooking}
           disabled={!selectedTime}
         >
-          <Text style={styles.bookButtonText}>Confirm Booking</Text>
+          <Text style={styles.bookButtonText}>
+            {reschedule === 'true' ? 'Confirm Reschedule' : 'Confirm Booking'}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -167,6 +251,16 @@ export default function BookingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
   },
   scrollContent: {
     padding: 16,
