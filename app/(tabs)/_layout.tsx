@@ -26,7 +26,7 @@ export default function TabLayout() {
       },
     ];
 
-    if (user?.userType === 'business') {
+    if (user?.userType === 'business_user') {
       return [
         ...baseTabs,
         {

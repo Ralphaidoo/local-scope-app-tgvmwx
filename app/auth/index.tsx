@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@react-navigation/native';
 import { router } from 'expo-router';
@@ -20,11 +20,29 @@ export default function AuthScreen() {
 
   const handleSubmit = async () => {
     setError('');
+    
+    // Validation
+    if (!email || !password) {
+      setError('Please enter email and password');
+      return;
+    }
+
+    if (!isLogin && !fullName) {
+      setError('Please enter your full name');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
     setLoading(true);
 
     try {
       if (isLogin) {
         await login(email, password);
+        // Navigate to home on successful login
         router.replace('/(tabs)/(home)/');
       } else {
         // For signup, we'll redirect to onboarding to select user type
@@ -33,9 +51,10 @@ export default function AuthScreen() {
           params: { email, password, fullName }
         });
       }
-    } catch (err) {
-      setError('Authentication failed. Please try again.');
+    } catch (err: any) {
       console.log('Auth error:', err);
+      const errorMessage = err?.message || 'Authentication failed. Please try again.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -70,6 +89,7 @@ export default function AuthScreen() {
                 value={fullName}
                 onChangeText={setFullName}
                 autoCapitalize="words"
+                editable={!loading}
               />
             </View>
           )}
@@ -84,6 +104,7 @@ export default function AuthScreen() {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              editable={!loading}
             />
           </View>
 
@@ -96,6 +117,7 @@ export default function AuthScreen() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              editable={!loading}
             />
           </View>
 
@@ -119,9 +141,10 @@ export default function AuthScreen() {
               setIsLogin(!isLogin);
               setError('');
             }}
+            disabled={loading}
           >
             <Text style={[styles.switchButtonText, { color: theme.colors.primary }]}>
-              {isLogin ? 'Don\'t have an account? Sign up' : 'Already have an account? Sign in'}
+              {isLogin ? 'Don&apos;t have an account? Sign up' : 'Already have an account? Sign in'}
             </Text>
           </Pressable>
         </GlassView>

@@ -93,13 +93,13 @@ export default function ProfileScreen() {
           </Text>
           <View style={styles.userTypeBadge}>
             <Text style={[styles.userTypeText, { color: theme.colors.text }]}>
-              {user?.userType === 'customer' ? 'Customer' : user?.userType === 'business' ? 'Business Owner' : 'Admin'}
+              {user?.userType === 'customer' ? 'Customer' : user?.userType === 'business_user' ? 'Business Owner' : 'Admin'}
             </Text>
           </View>
         </GlassView>
 
         {/* Add Business Button (for business users) */}
-        {user?.userType === 'business' && (
+        {user?.userType === 'business_user' && (
           <Pressable onPress={handleAddBusiness}>
             <GlassView
               style={[
@@ -127,7 +127,7 @@ export default function ProfileScreen() {
         )}
 
         {/* Subscription Card (for business users) */}
-        {user?.userType === 'business' && (
+        {user?.userType === 'business_user' && (
           <GlassView
             style={[
               styles.subscriptionCard,

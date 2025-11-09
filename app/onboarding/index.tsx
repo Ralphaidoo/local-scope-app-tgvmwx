@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -15,38 +15,28 @@ export default function OnboardingScreen() {
   const params = useLocalSearchParams();
   const [selectedType, setSelectedType] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const userTypes = [
-    {
-      type: 'customer' as UserType,
-      title: 'Customer',
-      description: 'Discover and shop from local businesses',
-      icon: 'person.fill',
-      color: '#007AFF',
-    },
-    {
-      type: 'business' as UserType,
-      title: 'Business Owner',
-      description: 'List your business and reach local customers',
-      icon: 'building.2.fill',
-      color: '#34C759',
-    },
-  ];
+  const email = params.email as string;
+  const password = params.password as string;
+  const fullName = params.fullName as string;
 
   const handleContinue = async () => {
-    if (!selectedType) return;
+    if (!selectedType) {
+      setError('Please select an account type');
+      return;
+    }
 
+    setError('');
     setLoading(true);
+
     try {
-      await signup(
-        params.email as string,
-        params.password as string,
-        params.fullName as string,
-        selectedType
-      );
+      await signup(email, password, fullName, selectedType);
+      // After successful signup, redirect to home
       router.replace('/(tabs)/(home)/');
-    } catch (error) {
-      console.log('Signup error:', error);
+    } catch (err: any) {
+      console.log('Signup error:', err);
+      setError(err?.message || 'Failed to create account. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -60,50 +50,99 @@ export default function OnboardingScreen() {
             Choose Your Account Type
           </Text>
           <Text style={[styles.subtitle, { color: theme.dark ? '#98989D' : '#666' }]}>
-            Select how you want to use Local Scope
+            Select how you&apos;ll be using Local Scope
           </Text>
         </View>
 
         <View style={styles.optionsContainer}>
-          {userTypes.map(userType => (
-            <Pressable
-              key={userType.type}
-              onPress={() => setSelectedType(userType.type)}
+          <Pressable
+            style={[
+              styles.optionCard,
+              selectedType === 'customer' && styles.optionCardSelected,
+            ]}
+            onPress={() => setSelectedType('customer')}
+            disabled={loading}
+          >
+            <GlassView
+              style={[
+                styles.optionContent,
+                Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+              ]}
+              glassEffectStyle="regular"
             >
-              <GlassView
-                style={[
-                  styles.optionCard,
-                  selectedType === userType.type && styles.optionCardSelected,
-                  Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
-                ]}
-                glassEffectStyle="regular"
-              >
-                <View style={[styles.iconContainer, { backgroundColor: userType.color }]}>
-                  <IconSymbol name={userType.icon} color="#fff" size={32} />
+              <View style={[styles.iconContainer, { backgroundColor: '#007AFF' }]}>
+                <IconSymbol name="person.fill" size={32} color="#fff" />
+              </View>
+              <Text style={[styles.optionTitle, { color: theme.colors.text }]}>
+                Customer
+              </Text>
+              <Text style={[styles.optionDescription, { color: theme.dark ? '#98989D' : '#666' }]}>
+                Discover and connect with local businesses
+              </Text>
+              {selectedType === 'customer' && (
+                <View style={styles.checkmark}>
+                  <IconSymbol name="checkmark.circle.fill" size={24} color="#007AFF" />
                 </View>
-                <View style={styles.optionContent}>
-                  <Text style={[styles.optionTitle, { color: theme.colors.text }]}>
-                    {userType.title}
-                  </Text>
-                  <Text style={[styles.optionDescription, { color: theme.dark ? '#98989D' : '#666' }]}>
-                    {userType.description}
-                  </Text>
+              )}
+            </GlassView>
+          </Pressable>
+
+          <Pressable
+            style={[
+              styles.optionCard,
+              selectedType === 'business_user' && styles.optionCardSelected,
+            ]}
+            onPress={() => setSelectedType('business_user')}
+            disabled={loading}
+          >
+            <GlassView
+              style={[
+                styles.optionContent,
+                Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+              ]}
+              glassEffectStyle="regular"
+            >
+              <View style={[styles.iconContainer, { backgroundColor: '#34C759' }]}>
+                <IconSymbol name="briefcase.fill" size={32} color="#fff" />
+              </View>
+              <Text style={[styles.optionTitle, { color: theme.colors.text }]}>
+                Business Owner
+              </Text>
+              <Text style={[styles.optionDescription, { color: theme.dark ? '#98989D' : '#666' }]}>
+                List and manage your business
+              </Text>
+              {selectedType === 'business_user' && (
+                <View style={styles.checkmark}>
+                  <IconSymbol name="checkmark.circle.fill" size={24} color="#34C759" />
                 </View>
-                {selectedType === userType.type && (
-                  <IconSymbol name="checkmark.circle.fill" color={userType.color} size={24} />
-                )}
-              </GlassView>
-            </Pressable>
-          ))}
+              )}
+            </GlassView>
+          </Pressable>
         </View>
 
+        {error ? (
+          <Text style={styles.errorText}>{error}</Text>
+        ) : null}
+
         <Pressable
-          style={[styles.continueButton, !selectedType && styles.continueButtonDisabled]}
+          style={[styles.continueButton, (!selectedType || loading) && styles.continueButtonDisabled]}
           onPress={handleContinue}
           disabled={!selectedType || loading}
         >
-          <Text style={styles.continueButtonText}>
-            {loading ? 'Creating Account...' : 'Continue'}
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.continueButtonText}>Continue</Text>
+          )}
+        </Pressable>
+
+        <Pressable
+          style={styles.backButton}
+          onPress={() => router.back()}
+          disabled={loading}
+        >
+          <Text style={[styles.backButtonText, { color: theme.colors.primary }]}>
+            Go Back
           </Text>
         </Pressable>
       </ScrollView>
@@ -124,7 +163,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 8,
   },
@@ -133,52 +172,69 @@ const styles = StyleSheet.create({
   },
   optionsContainer: {
     gap: 16,
-    marginBottom: 32,
+    marginBottom: 24,
   },
   optionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 20,
     borderRadius: 16,
-    gap: 16,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    overflow: 'hidden',
   },
   optionCardSelected: {
-    borderColor: '#007AFF',
+    transform: [{ scale: 0.98 }],
+  },
+  optionContent: {
+    padding: 24,
+    alignItems: 'center',
+    position: 'relative',
   },
   iconContainer: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    justifyContent: 'center',
     alignItems: 'center',
-  },
-  optionContent: {
-    flex: 1,
+    justifyContent: 'center',
+    marginBottom: 16,
   },
   optionTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontWeight: 'bold',
+    marginBottom: 8,
   },
   optionDescription: {
     fontSize: 14,
-    lineHeight: 20,
+    textAlign: 'center',
+  },
+  checkmark: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 14,
+    marginBottom: 16,
+    textAlign: 'center',
   },
   continueButton: {
     backgroundColor: '#007AFF',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
-    marginTop: 'auto',
+    marginBottom: 16,
   },
   continueButtonDisabled: {
-    opacity: 0.4,
+    opacity: 0.6,
   },
   continueButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  backButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  backButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserType, SubscriptionPlan } from '@/types';
 import { supabase } from '@/app/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
+import { Alert } from 'react-native';
 
 interface AuthContextType {
   user: User | null;
@@ -103,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.log('Login error:', error);
+        Alert.alert('Login Failed', error.message || 'Invalid email or password');
         throw error;
       }
 
@@ -110,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.user) {
         await loadUserProfile(data.user.id);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.log('Login error:', error);
       throw error;
     }
@@ -120,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Attempting signup for:', email, userType);
       
-      // Sign up the user
+      // Sign up the user - the trigger will automatically create the profile
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -135,33 +137,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (authError) {
         console.log('Signup error:', authError);
+        Alert.alert('Signup Failed', authError.message || 'Could not create account');
         throw authError;
       }
 
       console.log('Signup successful:', authData.user?.id);
 
-      // Create profile
+      // Update the profile with the user type since the trigger might not have set it
       if (authData.user) {
-        const { error: profileError } = await supabase
+        // Wait a moment for the trigger to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const { error: updateError } = await supabase
           .from('profiles')
-          .insert({
-            user_id: authData.user.id,
-            email: email,
+          .update({
             full_name: fullName,
             user_type: userType,
             subscription_plan: 'free',
             business_listing_count: 0,
             has_completed_onboarding: false,
-          });
+          })
+          .eq('user_id', authData.user.id);
 
-        if (profileError) {
-          console.log('Profile creation error:', profileError);
-          throw profileError;
+        if (updateError) {
+          console.log('Profile update error:', updateError);
+          // Don't throw here, the profile was created by the trigger
         }
+
+        // Show email verification message
+        Alert.alert(
+          'Verify Your Email',
+          'Please check your email and click the verification link to complete your registration.',
+          [{ text: 'OK' }]
+        );
 
         await loadUserProfile(authData.user.id);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.log('Signup error:', error);
       throw error;
     }
@@ -236,7 +248,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const canAddBusiness = (): boolean => {
-    if (!user || user.userType !== 'business') return false;
+    if (!user || user.userType !== 'business_user') return false;
     
     const limit = getBusinessLimit();
     const currentCount = user.businessListingCount || 0;
@@ -245,7 +257,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const getBusinessLimit = (): number => {
-    if (!user || user.userType !== 'business') return 0;
+    if (!user || user.userType !== 'business_user') return 0;
     
     const plan = user.subscriptionPlan || 'free';
     return plan === 'pro' ? 5 : 2;
