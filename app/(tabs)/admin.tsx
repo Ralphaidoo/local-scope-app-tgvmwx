@@ -324,9 +324,13 @@ export default function AdminScreen() {
                   .eq('id', userId);
                 if (error) throw error;
               } else if (action === 'promote') {
+                // Update user to admin with pro subscription
                 const { error } = await supabase
                   .from('profiles')
-                  .update({ user_type: 'admin' })
+                  .update({ 
+                    user_type: 'admin',
+                    subscription_plan: 'pro'
+                  })
                   .eq('id', userId);
                 if (error) throw error;
               }
@@ -376,7 +380,7 @@ export default function AdminScreen() {
         // Wait for trigger to create profile
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Update the profile to ensure admin status
+        // Update the profile to ensure admin status with pro subscription
         const { error: profileError } = await supabase
           .from('profiles')
           .update({
