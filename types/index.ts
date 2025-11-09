@@ -1,6 +1,8 @@
 
 export type UserType = 'customer' | 'business' | 'admin';
 
+export type SubscriptionPlan = 'free' | 'pro';
+
 export interface User {
   id: string;
   email: string;
@@ -9,6 +11,8 @@ export interface User {
   phone?: string;
   avatar?: string;
   createdAt: string;
+  subscriptionPlan?: SubscriptionPlan;
+  businessListingCount?: number;
 }
 
 export interface Business {
@@ -110,6 +114,7 @@ export interface Product {
   category: string;
   inStock: boolean;
   createdAt: string;
+  requiresPro?: boolean;
 }
 
 export interface Service {
@@ -121,6 +126,7 @@ export interface Service {
   duration: number; // in minutes
   available: boolean;
   createdAt: string;
+  requiresPro?: boolean;
 }
 
 export interface Review {
@@ -210,8 +216,6 @@ export interface Subscription {
   autoRenew: boolean;
 }
 
-export type SubscriptionPlan = 'free' | 'monthly' | 'annual';
-
 export interface Wallet {
   id: string;
   businessId: string;
@@ -242,3 +246,10 @@ export interface SearchFilters {
 }
 
 export type ViewMode = 'grid' | 'list' | 'map';
+
+export interface BoroughRegion {
+  name: LondonBorough;
+  businessCount: number;
+  color: string;
+  position: { x: number; y: number };
+}

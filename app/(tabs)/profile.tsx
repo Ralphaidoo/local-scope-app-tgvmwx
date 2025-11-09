@@ -1,18 +1,18 @@
 
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, Platform, Pressable, Alert } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { IconSymbol } from "@/components/IconSymbol";
-import { GlassView } from "expo-glass-effect";
-import { useTheme } from "@react-navigation/native";
-import { router } from "expo-router";
-import { useAuth } from "@/contexts/AuthContext";
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Platform, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '@react-navigation/native';
+import { router } from 'expo-router';
+import { IconSymbol } from '@/components/IconSymbol';
+import { GlassView } from 'expo-glass-effect';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function ProfileScreen() {
   const theme = useTheme();
-  const { user, logout } = useAuth();
+  const { user, logout, getBusinessLimit } = useAuth();
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     Alert.alert(
       'Logout',
       'Are you sure you want to logout?',
@@ -22,108 +22,229 @@ export default function ProfileScreen() {
           text: 'Logout',
           style: 'destructive',
           onPress: async () => {
-            await logout();
-            router.replace('/auth');
+            try {
+              await logout();
+              router.replace('/auth');
+            } catch (error) {
+              console.log('Logout error:', error);
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            }
           },
         },
       ]
     );
   };
 
-  if (!user) {
-    return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
-        <View style={styles.notLoggedIn}>
-          <IconSymbol name="person.circle" color={theme.dark ? '#98989D' : '#666'} size={64} />
-          <Text style={[styles.notLoggedInTitle, { color: theme.colors.text }]}>
-            Not Logged In
-          </Text>
-          <Text style={[styles.notLoggedInText, { color: theme.dark ? '#98989D' : '#666' }]}>
-            Sign in to access your profile
-          </Text>
-          <Pressable
-            style={styles.loginButton}
-            onPress={() => router.push('/auth')}
-          >
-            <Text style={styles.loginButtonText}>Sign In</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const menuItems = [
-    { icon: 'person', label: 'Edit Profile', route: '/profile/edit' },
-    { icon: 'heart', label: 'Favorites', route: '/(tabs)/favorites' },
-    { icon: 'bag', label: 'Orders', route: '/orders' },
-    { icon: 'calendar', label: 'Bookings', route: '/bookings' },
-    { icon: 'creditcard', label: 'Payment Methods', route: '/payment-methods' },
-    { icon: 'bell', label: 'Notifications', route: '/notifications' },
-    { icon: 'gear', label: 'Settings', route: '/settings' },
-    { icon: 'questionmark.circle', label: 'Help & Support', route: '/support' },
-  ];
+  const businessLimit = getBusinessLimit();
+  const currentBusinessCount = user?.businessListingCount || 0;
+  const subscriptionPlan = user?.subscriptionPlan || 'free';
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Profile</Text>
+      </View>
+
       <ScrollView
-        style={styles.container}
         contentContainerStyle={[
-          styles.contentContainer,
-          Platform.OS !== 'ios' && styles.contentContainerWithTabBar
+          styles.scrollContent,
+          Platform.OS !== 'ios' && styles.scrollContentWithTabBar
         ]}
+        showsVerticalScrollIndicator={false}
       >
-        <GlassView style={[
-          styles.profileHeader,
-          Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
-        ]} glassEffectStyle="regular">
-          <IconSymbol name="person.circle.fill" size={80} color={theme.colors.primary} />
-          <Text style={[styles.name, { color: theme.colors.text }]}>{user.fullName}</Text>
-          <Text style={[styles.email, { color: theme.dark ? '#98989D' : '#666' }]}>{user.email}</Text>
-          <View style={[styles.userTypeBadge, { backgroundColor: user.userType === 'business' ? '#34C759' : '#007AFF' }]}>
-            <Text style={styles.userTypeText}>
-              {user.userType === 'business' ? 'Business Owner' : user.userType === 'admin' ? 'Admin' : 'Customer'}
+        {/* User Info Card */}
+        <GlassView
+          style={[
+            styles.userCard,
+            Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+          ]}
+          glassEffectStyle="regular"
+        >
+          <View style={styles.avatarContainer}>
+            <View style={[styles.avatar, { backgroundColor: theme.dark ? '#333' : '#ddd' }]}>
+              <IconSymbol name="person.fill" color={theme.colors.text} size={40} />
+            </View>
+          </View>
+          <Text style={[styles.userName, { color: theme.colors.text }]}>
+            {user?.fullName || 'User'}
+          </Text>
+          <Text style={[styles.userEmail, { color: theme.dark ? '#98989D' : '#666' }]}>
+            {user?.email || 'user@example.com'}
+          </Text>
+          <View style={styles.userTypeBadge}>
+            <Text style={[styles.userTypeText, { color: theme.colors.text }]}>
+              {user?.userType === 'customer' ? 'Customer' : user?.userType === 'business' ? 'Business Owner' : 'Admin'}
             </Text>
           </View>
         </GlassView>
 
-        <GlassView style={[
-          styles.menuSection,
-          Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
-        ]} glassEffectStyle="regular">
-          {menuItems.map((item, index) => (
-            <Pressable
-              key={item.label}
+        {/* Subscription Card (for business users) */}
+        {user?.userType === 'business' && (
+          <GlassView
+            style={[
+              styles.subscriptionCard,
+              Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+            ]}
+            glassEffectStyle="regular"
+          >
+            <View style={styles.subscriptionHeader}>
+              <View style={styles.subscriptionInfo}>
+                <Text style={[styles.subscriptionLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
+                  Subscription Plan
+                </Text>
+                <View style={styles.subscriptionPlanRow}>
+                  <Text style={[styles.subscriptionPlan, { color: theme.colors.text }]}>
+                    {subscriptionPlan === 'free' ? 'Free' : 'Pro'}
+                  </Text>
+                  {subscriptionPlan === 'pro' && (
+                    <IconSymbol name="star.fill" color="#FFD700" size={20} />
+                  )}
+                </View>
+              </View>
+              <Pressable
+                style={[styles.upgradeButton, { backgroundColor: subscriptionPlan === 'free' ? '#007AFF' : theme.dark ? '#333' : '#ddd' }]}
+                onPress={() => router.push('/subscription')}
+              >
+                <Text style={[styles.upgradeButtonText, { color: subscriptionPlan === 'free' ? '#fff' : theme.colors.text }]}>
+                  {subscriptionPlan === 'free' ? 'Upgrade' : 'Manage'}
+                </Text>
+              </Pressable>
+            </View>
+            
+            <View style={styles.subscriptionStats}>
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: theme.colors.text }]}>
+                  {currentBusinessCount} / {businessLimit}
+                </Text>
+                <Text style={[styles.statLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
+                  Business Listings
+                </Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: theme.colors.text }]}>
+                  {subscriptionPlan === 'pro' ? 'Enabled' : 'Disabled'}
+                </Text>
+                <Text style={[styles.statLabel, { color: theme.dark ? '#98989D' : '#666' }]}>
+                  Bookings & Sales
+                </Text>
+              </View>
+            </View>
+
+            {subscriptionPlan === 'free' && (
+              <View style={styles.upgradePrompt}>
+                <IconSymbol name="star.circle.fill" color="#FFD700" size={24} />
+                <Text style={[styles.upgradePromptText, { color: theme.colors.text }]}>
+                  Upgrade to Pro to unlock bookings, product sales, and list up to 5 businesses!
+                </Text>
+              </View>
+            )}
+          </GlassView>
+        )}
+
+        {/* Menu Items */}
+        <View style={styles.menuSection}>
+          <Pressable onPress={() => router.push('/settings')}>
+            <GlassView
               style={[
                 styles.menuItem,
-                index < menuItems.length - 1 && styles.menuItemBorder,
-                { borderBottomColor: theme.dark ? '#333' : '#ddd' }
+                Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
               ]}
-              onPress={() => {
-                if (item.route) {
-                  router.push(item.route as any);
-                }
-              }}
+              glassEffectStyle="regular"
             >
               <View style={styles.menuItemLeft}>
-                <IconSymbol name={item.icon} size={22} color={theme.colors.text} />
-                <Text style={[styles.menuItemText, { color: theme.colors.text }]}>{item.label}</Text>
+                <IconSymbol name="gear" color={theme.colors.text} size={24} />
+                <Text style={[styles.menuItemText, { color: theme.colors.text }]}>
+                  Settings
+                </Text>
               </View>
-              <IconSymbol name="chevron.right" size={20} color={theme.dark ? '#98989D' : '#666'} />
+              <IconSymbol name="chevron.right" color={theme.dark ? '#98989D' : '#666'} size={20} />
+            </GlassView>
+          </Pressable>
+
+          <Pressable onPress={() => router.push('/notifications')}>
+            <GlassView
+              style={[
+                styles.menuItem,
+                Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+              ]}
+              glassEffectStyle="regular"
+            >
+              <View style={styles.menuItemLeft}>
+                <IconSymbol name="bell" color={theme.colors.text} size={24} />
+                <Text style={[styles.menuItemText, { color: theme.colors.text }]}>
+                  Notifications
+                </Text>
+              </View>
+              <IconSymbol name="chevron.right" color={theme.dark ? '#98989D' : '#666'} size={20} />
+            </GlassView>
+          </Pressable>
+
+          {user?.userType === 'customer' && (
+            <Pressable onPress={() => router.push('/bookings')}>
+              <GlassView
+                style={[
+                  styles.menuItem,
+                  Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+                ]}
+                glassEffectStyle="regular"
+              >
+                <View style={styles.menuItemLeft}>
+                  <IconSymbol name="calendar" color={theme.colors.text} size={24} />
+                  <Text style={[styles.menuItemText, { color: theme.colors.text }]}>
+                    My Bookings
+                  </Text>
+                </View>
+                <IconSymbol name="chevron.right" color={theme.dark ? '#98989D' : '#666'} size={20} />
+              </GlassView>
             </Pressable>
-          ))}
-        </GlassView>
+          )}
 
-        <Pressable
-          style={styles.logoutButton}
-          onPress={handleLogout}
-        >
-          <IconSymbol name="arrow.right.square" size={20} color="#FF3B30" />
-          <Text style={styles.logoutButtonText}>Logout</Text>
-        </Pressable>
+          <Pressable onPress={() => router.push('/payment-methods')}>
+            <GlassView
+              style={[
+                styles.menuItem,
+                Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+              ]}
+              glassEffectStyle="regular"
+            >
+              <View style={styles.menuItemLeft}>
+                <IconSymbol name="creditcard" color={theme.colors.text} size={24} />
+                <Text style={[styles.menuItemText, { color: theme.colors.text }]}>
+                  Payment Methods
+                </Text>
+              </View>
+              <IconSymbol name="chevron.right" color={theme.dark ? '#98989D' : '#666'} size={20} />
+            </GlassView>
+          </Pressable>
 
-        <Text style={[styles.version, { color: theme.dark ? '#666' : '#999' }]}>
-          Version 1.0.0
-        </Text>
+          <Pressable onPress={handleLogout}>
+            <GlassView
+              style={[
+                styles.menuItem,
+                Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+              ]}
+              glassEffectStyle="regular"
+            >
+              <View style={styles.menuItemLeft}>
+                <IconSymbol name="arrow.right.square" color="#FF3B30" size={24} />
+                <Text style={[styles.menuItemText, { color: '#FF3B30' }]}>
+                  Logout
+                </Text>
+              </View>
+              <IconSymbol name="chevron.right" color={theme.dark ? '#98989D' : '#666'} size={20} />
+            </GlassView>
+          </Pressable>
+        </View>
+
+        {/* App Info */}
+        <View style={styles.appInfo}>
+          <Text style={[styles.appInfoText, { color: theme.dark ? '#666' : '#999' }]}>
+            Local Scope v1.0.0
+          </Text>
+          <Text style={[styles.appInfoText, { color: theme.dark ? '#666' : '#999' }]}>
+            © 2024 Local Scope. All rights reserved.
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -133,81 +254,133 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  container: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 20,
-  },
-  contentContainerWithTabBar: {
-    paddingBottom: 100,
-  },
-  notLoggedIn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  notLoggedInTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  notLoggedInText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  loginButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 32,
+  header: {
+    paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 12,
   },
-  loginButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  profileHeader: {
-    alignItems: 'center',
-    borderRadius: 12,
-    padding: 32,
-    marginBottom: 16,
-    gap: 12,
-  },
-  name: {
-    fontSize: 24,
+  headerTitle: {
+    fontSize: 28,
     fontWeight: 'bold',
   },
-  email: {
-    fontSize: 16,
+  scrollContent: {
+    paddingVertical: 8,
+  },
+  scrollContentWithTabBar: {
+    paddingBottom: 100,
+  },
+  userCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  avatarContainer: {
+    marginBottom: 16,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  userEmail: {
+    fontSize: 14,
+    marginBottom: 12,
   },
   userTypeBadge: {
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 16,
-    marginTop: 8,
+    backgroundColor: 'rgba(0, 122, 255, 0.2)',
   },
   userTypeText: {
-    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  subscriptionCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 20,
+    borderRadius: 16,
+  },
+  subscriptionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  subscriptionInfo: {
+    flex: 1,
+  },
+  subscriptionLabel: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  subscriptionPlanRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  subscriptionPlan: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  upgradeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  upgradeButtonText: {
     fontSize: 14,
     fontWeight: '600',
   },
-  menuSection: {
-    borderRadius: 12,
-    overflow: 'hidden',
+  subscriptionStats: {
+    flexDirection: 'row',
+    gap: 16,
     marginBottom: 16,
+  },
+  statItem: {
+    flex: 1,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+  },
+  upgradePrompt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+  },
+  upgradePromptText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  menuSection: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    gap: 12,
   },
   menuItem: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 16,
-  },
-  menuItemBorder: {
-    borderBottomWidth: 1,
+    borderRadius: 12,
   },
   menuItemLeft: {
     flexDirection: 'row',
@@ -216,26 +389,14 @@ const styles = StyleSheet.create({
   },
   menuItemText: {
     fontSize: 16,
+    fontWeight: '500',
   },
-  logoutButton: {
-    flexDirection: 'row',
+  appInfo: {
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FF3B30',
-    marginBottom: 16,
+    paddingVertical: 20,
   },
-  logoutButtonText: {
-    color: '#FF3B30',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  version: {
+  appInfoText: {
     fontSize: 12,
-    textAlign: 'center',
-    marginTop: 8,
+    marginBottom: 4,
   },
 });

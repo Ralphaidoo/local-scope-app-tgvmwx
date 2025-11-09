@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, UserType } from '@/types';
+import { User, UserType, SubscriptionPlan } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface AuthContextType {
@@ -11,6 +11,9 @@ interface AuthContextType {
   signup: (email: string, password: string, fullName: string, userType: UserType) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<User>) => Promise<void>;
+  upgradeSubscription: (plan: SubscriptionPlan) => Promise<void>;
+  canAddBusiness: () => boolean;
+  getBusinessLimit: () => number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -45,6 +48,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fullName: 'John Doe',
         userType: 'customer',
         createdAt: new Date().toISOString(),
+        subscriptionPlan: 'free',
+        businessListingCount: 0,
       };
       
       await AsyncStorage.setItem('user', JSON.stringify(mockUser));
@@ -64,6 +69,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fullName,
         userType,
         createdAt: new Date().toISOString(),
+        subscriptionPlan: 'free',
+        businessListingCount: 0,
       };
       
       await AsyncStorage.setItem('user', JSON.stringify(newUser));
@@ -97,6 +104,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const upgradeSubscription = async (plan: SubscriptionPlan) => {
+    try {
+      if (!user) return;
+      
+      const updatedUser = { ...user, subscriptionPlan: plan };
+      await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+    } catch (error) {
+      console.log('Upgrade subscription error:', error);
+      throw error;
+    }
+  };
+
+  const canAddBusiness = (): boolean => {
+    if (!user || user.userType !== 'business') return false;
+    
+    const limit = getBusinessLimit();
+    const currentCount = user.businessListingCount || 0;
+    
+    return currentCount < limit;
+  };
+
+  const getBusinessLimit = (): number => {
+    if (!user || user.userType !== 'business') return 0;
+    
+    const plan = user.subscriptionPlan || 'free';
+    return plan === 'pro' ? 5 : 2;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -107,6 +143,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signup,
         logout,
         updateProfile,
+        upgradeSubscription,
+        canAddBusiness,
+        getBusinessLimit,
       }}
     >
       {children}

@@ -14,7 +14,7 @@ export default function DiscoverScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<BusinessCategory | null>(null);
   const [selectedBorough, setSelectedBorough] = useState<LondonBorough | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [viewMode, setViewMode] = useState<ViewMode>('map');
   const [showFilters, setShowFilters] = useState(false);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [minRating, setMinRating] = useState(0);
@@ -29,6 +29,60 @@ export default function DiscoverScreen() {
     
     return matchesSearch && matchesCategory && matchesBorough && matchesVerified && matchesRating;
   });
+
+  // Group businesses by borough for the map view
+  const boroughBusinessCounts = boroughs.reduce((acc, borough) => {
+    acc[borough] = mockBusinesses.filter(b => b.borough === borough).length;
+    return acc;
+  }, {} as Record<LondonBorough, number>);
+
+  // Borough regions with positions for visual map
+  const boroughRegions: Array<{ name: LondonBorough; count: number; zone: string }> = [
+    // Central London
+    { name: 'Westminster', count: boroughBusinessCounts['Westminster'], zone: 'Central' },
+    { name: 'Camden', count: boroughBusinessCounts['Camden'], zone: 'Central' },
+    { name: 'Islington', count: boroughBusinessCounts['Islington'], zone: 'Central' },
+    { name: 'Kensington and Chelsea', count: boroughBusinessCounts['Kensington and Chelsea'], zone: 'Central' },
+    
+    // North London
+    { name: 'Barnet', count: boroughBusinessCounts['Barnet'], zone: 'North' },
+    { name: 'Enfield', count: boroughBusinessCounts['Enfield'], zone: 'North' },
+    { name: 'Haringey', count: boroughBusinessCounts['Haringey'], zone: 'North' },
+    
+    // East London
+    { name: 'Hackney', count: boroughBusinessCounts['Hackney'], zone: 'East' },
+    { name: 'Tower Hamlets', count: boroughBusinessCounts['Tower Hamlets'], zone: 'East' },
+    { name: 'Newham', count: boroughBusinessCounts['Newham'], zone: 'East' },
+    { name: 'Redbridge', count: boroughBusinessCounts['Redbridge'], zone: 'East' },
+    { name: 'Barking and Dagenham', count: boroughBusinessCounts['Barking and Dagenham'], zone: 'East' },
+    { name: 'Waltham Forest', count: boroughBusinessCounts['Waltham Forest'], zone: 'East' },
+    
+    // South London
+    { name: 'Southwark', count: boroughBusinessCounts['Southwark'], zone: 'South' },
+    { name: 'Lambeth', count: boroughBusinessCounts['Lambeth'], zone: 'South' },
+    { name: 'Lewisham', count: boroughBusinessCounts['Lewisham'], zone: 'South' },
+    { name: 'Greenwich', count: boroughBusinessCounts['Greenwich'], zone: 'South' },
+    { name: 'Bromley', count: boroughBusinessCounts['Bromley'], zone: 'South' },
+    { name: 'Croydon', count: boroughBusinessCounts['Croydon'], zone: 'South' },
+    { name: 'Sutton', count: boroughBusinessCounts['Sutton'], zone: 'South' },
+    { name: 'Merton', count: boroughBusinessCounts['Merton'], zone: 'South' },
+    
+    // West London
+    { name: 'Hammersmith and Fulham', count: boroughBusinessCounts['Hammersmith and Fulham'], zone: 'West' },
+    { name: 'Ealing', count: boroughBusinessCounts['Ealing'], zone: 'West' },
+    { name: 'Hounslow', count: boroughBusinessCounts['Hounslow'], zone: 'West' },
+    { name: 'Richmond upon Thames', count: boroughBusinessCounts['Richmond upon Thames'], zone: 'West' },
+    { name: 'Kingston upon Thames', count: boroughBusinessCounts['Kingston upon Thames'], zone: 'West' },
+    { name: 'Wandsworth', count: boroughBusinessCounts['Wandsworth'], zone: 'West' },
+    { name: 'Brent', count: boroughBusinessCounts['Brent'], zone: 'West' },
+    { name: 'Harrow', count: boroughBusinessCounts['Harrow'], zone: 'West' },
+    { name: 'Hillingdon', count: boroughBusinessCounts['Hillingdon'], zone: 'West' },
+    
+    // Southeast
+    { name: 'Bexley', count: boroughBusinessCounts['Bexley'], zone: 'South' },
+  ];
+
+  const zones = ['Central', 'North', 'East', 'South', 'West'];
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
@@ -48,7 +102,7 @@ export default function DiscoverScreen() {
           <Pressable
             style={styles.headerButton}
             onPress={() => {
-              const modes: ViewMode[] = ['list', 'grid', 'map'];
+              const modes: ViewMode[] = ['map', 'list', 'grid'];
               const currentIndex = modes.indexOf(viewMode);
               const nextIndex = (currentIndex + 1) % modes.length;
               setViewMode(modes[nextIndex]);
@@ -137,44 +191,6 @@ export default function DiscoverScreen() {
               ))}
             </ScrollView>
 
-            {/* Borough Filter */}
-            <Text style={[styles.filterLabel, { color: theme.dark ? '#98989D' : '#666' }]}>Borough</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-              <Pressable
-                style={[
-                  styles.filterChip,
-                  !selectedBorough && styles.filterChipActive,
-                  { borderColor: theme.dark ? '#333' : '#ddd' }
-                ]}
-                onPress={() => setSelectedBorough(null)}
-              >
-                <Text style={[
-                  styles.filterChipText,
-                  { color: !selectedBorough ? '#fff' : theme.colors.text }
-                ]}>
-                  All
-                </Text>
-              </Pressable>
-              {boroughs.slice(0, 10).map(borough => (
-                <Pressable
-                  key={borough}
-                  style={[
-                    styles.filterChip,
-                    selectedBorough === borough && styles.filterChipActive,
-                    { borderColor: theme.dark ? '#333' : '#ddd' }
-                  ]}
-                  onPress={() => setSelectedBorough(borough)}
-                >
-                  <Text style={[
-                    styles.filterChipText,
-                    { color: selectedBorough === borough ? '#fff' : theme.colors.text }
-                  ]}>
-                    {borough}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-
             {/* Additional Filters */}
             <Pressable
               style={styles.filterOption}
@@ -218,25 +234,109 @@ export default function DiscoverScreen() {
           </GlassView>
         )}
 
-        {/* Results */}
+        {/* Results Header */}
+        {selectedBorough && (
+          <View style={styles.selectedBoroughHeader}>
+            <GlassView
+              style={[
+                styles.selectedBoroughBadge,
+                Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+              ]}
+              glassEffectStyle="regular"
+            >
+              <IconSymbol name="mappin.circle.fill" color="#007AFF" size={20} />
+              <Text style={[styles.selectedBoroughText, { color: theme.colors.text }]}>
+                {selectedBorough}
+              </Text>
+              <Pressable onPress={() => setSelectedBorough(null)}>
+                <IconSymbol name="xmark.circle.fill" color={theme.dark ? '#98989D' : '#666'} size={20} />
+              </Pressable>
+            </GlassView>
+          </View>
+        )}
+
         <View style={styles.resultsHeader}>
           <Text style={[styles.resultsText, { color: theme.dark ? '#98989D' : '#666' }]}>
             {filteredBusinesses.length} {filteredBusinesses.length === 1 ? 'business' : 'businesses'} found
           </Text>
         </View>
 
+        {/* Map View - Borough Selector */}
         {viewMode === 'map' && (
-          <View style={[styles.mapPlaceholder, { backgroundColor: theme.dark ? '#1c1c1e' : '#f0f0f0' }]}>
-            <IconSymbol name="map" color={theme.dark ? '#98989D' : '#666'} size={48} />
-            <Text style={[styles.mapPlaceholderText, { color: theme.dark ? '#98989D' : '#666' }]}>
-              Map view is not supported in Natively at this time.
+          <View style={styles.mapContainer}>
+            <Text style={[styles.mapTitle, { color: theme.colors.text }]}>
+              Select a Borough or Area
             </Text>
-            <Text style={[styles.mapPlaceholderSubtext, { color: theme.dark ? '#666' : '#999' }]}>
-              Please use list or grid view instead.
+            <Text style={[styles.mapSubtitle, { color: theme.dark ? '#98989D' : '#666' }]}>
+              Tap on any zone to see businesses in that area
             </Text>
+            
+            {zones.map(zone => (
+              <View key={zone} style={styles.zoneSection}>
+                <Text style={[styles.zoneTitle, { color: theme.colors.text }]}>
+                  {zone} London
+                </Text>
+                <View style={styles.boroughGrid}>
+                  {boroughRegions
+                    .filter(region => region.zone === zone)
+                    .map(region => (
+                      <Pressable
+                        key={region.name}
+                        onPress={() => {
+                          setSelectedBorough(region.name);
+                          setViewMode('list');
+                        }}
+                      >
+                        <GlassView
+                          style={[
+                            styles.boroughCard,
+                            selectedBorough === region.name && styles.boroughCardSelected,
+                            Platform.OS !== 'ios' && { 
+                              backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' 
+                            }
+                          ]}
+                          glassEffectStyle="regular"
+                        >
+                          <View style={styles.boroughCardHeader}>
+                            <IconSymbol 
+                              name="building.2.fill" 
+                              color={selectedBorough === region.name ? '#007AFF' : theme.dark ? '#98989D' : '#666'} 
+                              size={24} 
+                            />
+                            <View style={[
+                              styles.boroughBadge,
+                              { backgroundColor: selectedBorough === region.name ? '#007AFF' : theme.dark ? '#333' : '#ddd' }
+                            ]}>
+                              <Text style={[
+                                styles.boroughBadgeText,
+                                { color: selectedBorough === region.name ? '#fff' : theme.colors.text }
+                              ]}>
+                                {region.count}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text 
+                            style={[
+                              styles.boroughName, 
+                              { color: selectedBorough === region.name ? '#007AFF' : theme.colors.text }
+                            ]}
+                            numberOfLines={2}
+                          >
+                            {region.name}
+                          </Text>
+                          <Text style={[styles.boroughCount, { color: theme.dark ? '#98989D' : '#666' }]}>
+                            {region.count} {region.count === 1 ? 'business' : 'businesses'}
+                          </Text>
+                        </GlassView>
+                      </Pressable>
+                    ))}
+                </View>
+              </View>
+            ))}
           </View>
         )}
 
+        {/* List View */}
         {viewMode === 'list' && filteredBusinesses.map(business => (
           <Pressable
             key={business.id}
@@ -275,6 +375,7 @@ export default function DiscoverScreen() {
           </Pressable>
         ))}
 
+        {/* Grid View */}
         {viewMode === 'grid' && (
           <View style={styles.gridContainer}>
             {filteredBusinesses.map(business => (
@@ -421,12 +522,89 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  selectedBoroughHeader: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  selectedBoroughBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+  },
+  selectedBoroughText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
   resultsHeader: {
     paddingHorizontal: 16,
     marginBottom: 12,
   },
   resultsText: {
     fontSize: 14,
+  },
+  mapContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  mapTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  mapSubtitle: {
+    fontSize: 14,
+    marginBottom: 20,
+  },
+  zoneSection: {
+    marginBottom: 24,
+  },
+  zoneTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  boroughGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  boroughCard: {
+    width: 160,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  boroughCardSelected: {
+    borderWidth: 2,
+    borderColor: '#007AFF',
+  },
+  boroughCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  boroughBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  boroughBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  boroughName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+    minHeight: 40,
+  },
+  boroughCount: {
+    fontSize: 12,
   },
   businessCard: {
     marginHorizontal: 16,
@@ -500,24 +678,5 @@ const styles = StyleSheet.create({
   },
   gridRatingText: {
     fontSize: 12,
-  },
-  mapPlaceholder: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapPlaceholderText: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginTop: 16,
-    textAlign: 'center',
-  },
-  mapPlaceholderSubtext: {
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
   },
 });
