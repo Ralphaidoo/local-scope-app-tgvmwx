@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserType, SubscriptionPlan } from '@/types';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -28,7 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
 
-  // Updated loadProfile function as requested
+  // Updated loadProfile with full console tracing
   const loadProfile = async (userId: string) => {
     const { data, error } = await supabase
       .from('profiles')
@@ -36,7 +35,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .eq('user_id', userId)
       .maybeSingle();
 
-    console.log('Loaded profile from Supabase:', data);
+    console.log('Profile from Supabase →', data);
+    console.log('User ID used for profile fetch →', userId);
 
     if (error) {
       console.error('Profile fetch error:', error);
@@ -44,20 +44,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (data) {
+      console.log('Setting user with normalized userType:', data.user_type);
+
       setUser({
         id: data.id,
         email: data.email || '',
         fullName: data.full_name || '',
-        userType: data.user_type, // normalize key
+        userType: data.user_type, // normalized key for client checks
         createdAt: new Date().toISOString(),
         subscriptionPlan: (data.subscription_plan as SubscriptionPlan) || 'free',
         businessListingCount: 0,
       });
+
+      console.log('User successfully set in state');
+    } else {
+      console.warn('No profile found for this userId');
     }
   };
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
         console.log('Error getting initial session:', error);
@@ -73,18 +78,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log('Auth state changed:', _event, session?.user?.id);
       setSession(session);
       
       if (session?.user) {
-        // For email confirmation events, wait a bit for the profile to be created
         if (_event === 'SIGNED_IN' || _event === 'USER_UPDATED') {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
-        
-        // Call loadProfile after auth state change
         await loadProfile(session.user.id);
       } else {
         setUser(null);
@@ -111,7 +112,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('No session available for refreshProfile');
       return;
     }
-
     console.log('=== REFRESH PROFILE CALLED ===');
     await loadProfile(session.user.id);
   };
@@ -119,15 +119,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       console.log('Attempting login for:', email);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
       if (error) {
         console.log('Login error:', error);
-        
-        // Check for specific error messages
         if (error.message.includes('Email not confirmed')) {
           Alert.alert(
             'Email Not Verified',
@@ -143,11 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       console.log('Login successful:', data.user?.id);
-      
-      // Call loadProfile right after successful login
-      if (data.session?.user?.id) {
-        await loadProfile(data.session.user.id);
-      }
+      if (data.session?.user?.id) await loadProfile(data.session.user.id);
     } catch (error: any) {
       console.log('Login error:', error);
       throw error;
@@ -157,17 +148,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signup = async (email: string, password: string, fullName: string, userType: UserType) => {
     try {
       console.log('Attempting signup for:', email, userType);
-      
-      // Sign up the user - the trigger will automatically create the profile
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: 'https://natively.dev/email-confirmed',
-          data: {
-            full_name: fullName,
-            user_type: userType,
-          }
+          data: { full_name: fullName, user_type: userType }
         }
       });
 
@@ -178,16 +164,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       console.log('Signup successful:', authData.user?.id);
+      if (authData.session?.user?.id) await loadProfile(authData.session.user.id);
 
-      // Call loadProfile right after successful signup (if session exists)
-      if (authData.session?.user?.id) {
-        await loadProfile(authData.session.user.id);
-      }
-
-      // Show email verification message
       Alert.alert(
         'Verify Your Email',
-        'We\'ve sent a verification link to your email address. Please check your inbox (and spam folder) and click the link to verify your account before signing in.',
+        'We\'ve sent a verification link to your email. Please check your inbox or spam folder.',
         [{ text: 'OK' }]
       );
     } catch (error: any) {
@@ -211,48 +192,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updateProfile = async (updates: Partial<User>) => {
     try {
-      // Verify we have an active session
       const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        console.log('Session error in updateProfile:', sessionError);
-        throw new Error('Failed to verify session. Please try logging in again.');
-      }
+      if (sessionError || !currentSession) throw new Error('Session expired. Please log in again.');
+      if (!user) throw new Error('No user data available');
 
-      if (!currentSession) {
-        console.log('No active session in updateProfile');
-        throw new Error('Your session has expired. Please log in again.');
-      }
-
-      if (!user) {
-        throw new Error('No user data available');
-      }
-      
-      console.log('Updating profile for user:', currentSession.user.id, updates);
-      
+      console.log('Updating profile for:', currentSession.user.id, updates);
       const profileUpdates: any = {};
       if (updates.fullName !== undefined) profileUpdates.full_name = updates.fullName;
       if (updates.phone !== undefined) profileUpdates.phone = updates.phone;
       if (updates.userType !== undefined) {
-        // Update both user_type and role to keep them in sync
         profileUpdates.user_type = updates.userType;
         profileUpdates.role = updates.userType;
       }
-      if (updates.subscriptionPlan !== undefined) profileUpdates.subscription_plan = updates.subscriptionPlan;
-      if (updates.businessListingCount !== undefined) profileUpdates.business_listing_count = updates.businessListingCount;
+      if (updates.subscriptionPlan !== undefined)
+        profileUpdates.subscription_plan = updates.subscriptionPlan;
+      if (updates.businessListingCount !== undefined)
+        profileUpdates.business_listing_count = updates.businessListingCount;
 
       const { error } = await supabase
         .from('profiles')
         .update(profileUpdates)
         .eq('user_id', currentSession.user.id);
+      if (error) throw error;
 
-      if (error) {
-        console.log('Update profile error:', error);
-        throw error;
-      }
-
-      const updatedUser = { ...user, ...updates };
-      setUser(updatedUser);
+      setUser({ ...user, ...updates });
       console.log('Profile updated successfully');
     } catch (error: any) {
       console.log('Update profile error:', error);
@@ -262,31 +225,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const upgradeSubscription = async (plan: SubscriptionPlan) => {
     try {
-      // Verify we have an active session
       const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError || !currentSession) {
-        throw new Error('Session expired. Please log in again.');
-      }
+      if (sessionError || !currentSession) throw new Error('Session expired. Please log in again.');
+      if (!user) throw new Error('No user data available');
 
-      if (!user) {
-        throw new Error('No user data available');
-      }
-      
       console.log('Upgrading subscription to:', plan);
-      
       const { error } = await supabase
         .from('profiles')
         .update({ subscription_plan: plan })
         .eq('user_id', currentSession.user.id);
+      if (error) throw error;
 
-      if (error) {
-        console.log('Upgrade subscription error:', error);
-        throw error;
-      }
-
-      const updatedUser = { ...user, subscriptionPlan: plan };
-      setUser(updatedUser);
+      setUser({ ...user, subscriptionPlan: plan });
     } catch (error) {
       console.log('Upgrade subscription error:', error);
       throw error;
@@ -295,36 +245,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const canAddBusiness = (): boolean => {
     if (!user) return false;
-    
-    // Admin users can always add businesses (using normalized userType field)
-    if (user.userType === 'admin') {
-      console.log('Admin user - can add business');
-      return true;
-    }
-    
-    // Business users need to check their limit
+    if (user.userType === 'admin') return true;
     if (user.userType !== 'business_user') return false;
-    
     const limit = getBusinessLimit();
     const currentCount = user.businessListingCount || 0;
-    
     return currentCount < limit;
   };
 
   const getBusinessLimit = (): number => {
     if (!user) return 0;
-    
-    // Admin users have unlimited businesses (using normalized userType field)
-    if (user.userType === 'admin') {
-      console.log('Admin user - unlimited business limit');
-      return 999;
-    }
-    
-    // Business users have limits based on their plan
+    if (user.userType === 'admin') return 999;
     if (user.userType !== 'business_user') return 0;
-    
-    const plan = user.subscriptionPlan || 'free';
-    return plan === 'pro' ? 5 : 2;
+    return user.subscriptionPlan === 'pro' ? 5 : 2;
   };
 
   return (
@@ -352,8 +284,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 }
