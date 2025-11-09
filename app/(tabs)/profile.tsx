@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Platform, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@react-navigation/native';
 import { router } from 'expo-router';
@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function ProfileScreen() {
   const theme = useTheme();
-  const { user, logout, getBusinessLimit, canAddBusiness } = useAuth();
+  const { user, logout, getBusinessLimit, canAddBusiness, isLoading } = useAuth();
 
   const handleLogout = () => {
     Alert.alert(
@@ -55,6 +55,46 @@ export default function ProfileScreen() {
     router.push('/business-management');
   };
 
+  // Show loading state
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+            Loading profile...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show error state if no user data
+  if (!user) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
+        <View style={styles.errorContainer}>
+          <IconSymbol name="exclamationmark.triangle.fill" color="#FF3B30" size={64} />
+          <Text style={[styles.errorTitle, { color: theme.colors.text }]}>
+            No User Data Available
+          </Text>
+          <Text style={[styles.errorMessage, { color: theme.dark ? '#98989D' : '#666' }]}>
+            We couldn&apos;t load your profile information. Please try logging in again.
+          </Text>
+          <Pressable
+            style={styles.retryButton}
+            onPress={() => {
+              logout();
+              router.replace('/auth');
+            }}
+          >
+            <Text style={styles.retryButtonText}>Go to Login</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const businessLimit = getBusinessLimit();
   const currentBusinessCount = user?.businessListingCount || 0;
   const subscriptionPlan = user?.subscriptionPlan || 'free';
@@ -88,14 +128,14 @@ export default function ProfileScreen() {
             </View>
           </View>
           <Text style={[styles.userName, { color: theme.colors.text }]}>
-            {user?.fullName || 'User'}
+            {user.fullName || 'User'}
           </Text>
           <Text style={[styles.userEmail, { color: theme.dark ? '#98989D' : '#666' }]}>
-            {user?.email || 'user@example.com'}
+            {user.email || 'user@example.com'}
           </Text>
           <View style={styles.userTypeBadge}>
             <Text style={[styles.userTypeText, { color: theme.colors.text }]}>
-              {user?.userType === 'customer' ? 'Customer' : user?.userType === 'business_user' ? 'Business Owner' : 'Admin'}
+              {user.userType === 'customer' ? 'Customer' : user.userType === 'business_user' ? 'Business Owner' : 'Admin'}
             </Text>
           </View>
           
@@ -277,7 +317,7 @@ export default function ProfileScreen() {
             </GlassView>
           </Pressable>
 
-          {user?.userType === 'customer' && (
+          {user.userType === 'customer' && (
             <Pressable onPress={() => router.push('/bookings')}>
               <GlassView
                 style={[
@@ -359,6 +399,44 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    gap: 16,
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   scrollContent: {
     paddingVertical: 8,

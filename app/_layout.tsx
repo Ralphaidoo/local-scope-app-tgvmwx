@@ -1,5 +1,4 @@
 
-
 import { useNetworkState } from "expo-network";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
@@ -9,12 +8,12 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import * as SplashScreen from "expo-splash-screen";
-import { useColorScheme, Alert } from "react-native";
+import { useColorScheme, View, ActivityIndicator } from "react-native";
 import { Button } from "@/components/button";
 import { WidgetProvider } from "@/contexts/WidgetContext";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
-import { Stack, router } from "expo-router";
+import { Stack, router, useSegments, useRootNavigationState } from "expo-router";
 import { SystemBars } from "react-native-edge-to-edge";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
@@ -22,6 +21,183 @@ import { useFonts } from "expo-font";
 import "react-native-reanimated";
 
 SplashScreen.preventAutoHideAsync();
+
+function RootLayoutNav() {
+  const { user, isLoading, isAuthenticated } = useAuth();
+  const segments = useSegments();
+  const navigationState = useRootNavigationState();
+
+  useEffect(() => {
+    if (!navigationState?.key || isLoading) {
+      console.log('Navigation not ready or auth loading');
+      return;
+    }
+
+    const inAuthGroup = segments[0] === 'auth' || segments[0] === 'onboarding' || segments[0] === 'email-confirmed';
+    
+    console.log('Auth state:', { isAuthenticated, isLoading, user: user?.email, segments, inAuthGroup });
+
+    if (!isAuthenticated && !inAuthGroup) {
+      // Redirect to auth if not authenticated and not already in auth flow
+      console.log('Redirecting to auth - user not authenticated');
+      router.replace('/auth');
+    } else if (isAuthenticated && inAuthGroup) {
+      // Redirect to home if authenticated and in auth flow
+      console.log('Redirecting to home - user authenticated');
+      router.replace('/(tabs)/(home)/');
+    }
+  }, [isAuthenticated, segments, navigationState?.key, isLoading]);
+
+  // Show loading screen while checking authentication
+  if (isLoading || !navigationState?.key) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
+
+  return (
+    <Stack>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="auth" options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+      <Stack.Screen name="email-confirmed" options={{ headerShown: false }} />
+      <Stack.Screen 
+        name="business/[id]" 
+        options={{ 
+          presentation: 'card',
+          headerShown: true,
+          title: 'Business Details'
+        }} 
+      />
+      <Stack.Screen 
+        name="cart" 
+        options={{ 
+          presentation: 'card',
+          headerShown: true,
+          title: 'Shopping Cart'
+        }} 
+      />
+      <Stack.Screen 
+        name="messages" 
+        options={{ 
+          presentation: 'card',
+          headerShown: true,
+          title: 'Messages'
+        }} 
+      />
+      <Stack.Screen 
+        name="booking" 
+        options={{ 
+          presentation: 'modal',
+          headerShown: true,
+          title: 'Book Service'
+        }} 
+      />
+      <Stack.Screen 
+        name="bookings" 
+        options={{ 
+          presentation: 'card',
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="orders" 
+        options={{ 
+          presentation: 'card',
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="business-management" 
+        options={{ 
+          presentation: 'modal',
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="products" 
+        options={{ 
+          presentation: 'card',
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="wallet" 
+        options={{ 
+          presentation: 'card',
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="reviews" 
+        options={{ 
+          presentation: 'modal',
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="checkout" 
+        options={{ 
+          presentation: 'card',
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="settings" 
+        options={{ 
+          presentation: 'card',
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="notifications" 
+        options={{ 
+          presentation: 'card',
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="subscription" 
+        options={{ 
+          presentation: 'card',
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="payment-methods" 
+        options={{ 
+          presentation: 'card',
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="profile/edit" 
+        options={{ 
+          presentation: 'card',
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen name="modal" options={{ presentation: "modal" }} />
+      <Stack.Screen
+        name="formsheet"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.5, 1],
+          sheetGrabberVisible: true,
+        }}
+      />
+      <Stack.Screen
+        name="transparent-modal"
+        options={{
+          presentation: "transparentModal",
+          animation: "fade",
+        }}
+      />
+    </Stack>
+  );
+}
 
 export default function RootLayout() {
   const [loaded] = useFonts({
@@ -48,136 +224,7 @@ export default function RootLayout() {
           <WidgetProvider>
             <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
               <SystemBars style={colorScheme === "dark" ? "light" : "dark"} />
-              <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="auth" options={{ headerShown: false }} />
-                <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-                <Stack.Screen 
-                  name="business/[id]" 
-                  options={{ 
-                    presentation: 'card',
-                    headerShown: true,
-                    title: 'Business Details'
-                  }} 
-                />
-                <Stack.Screen 
-                  name="cart" 
-                  options={{ 
-                    presentation: 'card',
-                    headerShown: true,
-                    title: 'Shopping Cart'
-                  }} 
-                />
-                <Stack.Screen 
-                  name="messages" 
-                  options={{ 
-                    presentation: 'card',
-                    headerShown: true,
-                    title: 'Messages'
-                  }} 
-                />
-                <Stack.Screen 
-                  name="booking" 
-                  options={{ 
-                    presentation: 'modal',
-                    headerShown: true,
-                    title: 'Book Service'
-                  }} 
-                />
-                <Stack.Screen 
-                  name="bookings" 
-                  options={{ 
-                    presentation: 'card',
-                    headerShown: false,
-                  }} 
-                />
-                <Stack.Screen 
-                  name="orders" 
-                  options={{ 
-                    presentation: 'card',
-                    headerShown: false,
-                  }} 
-                />
-                <Stack.Screen 
-                  name="business-management" 
-                  options={{ 
-                    presentation: 'modal',
-                    headerShown: false,
-                  }} 
-                />
-                <Stack.Screen 
-                  name="products" 
-                  options={{ 
-                    presentation: 'card',
-                    headerShown: false,
-                  }} 
-                />
-                <Stack.Screen 
-                  name="wallet" 
-                  options={{ 
-                    presentation: 'card',
-                    headerShown: false,
-                  }} 
-                />
-                <Stack.Screen 
-                  name="reviews" 
-                  options={{ 
-                    presentation: 'modal',
-                    headerShown: false,
-                  }} 
-                />
-                <Stack.Screen 
-                  name="checkout" 
-                  options={{ 
-                    presentation: 'card',
-                    headerShown: false,
-                  }} 
-                />
-                <Stack.Screen 
-                  name="settings" 
-                  options={{ 
-                    presentation: 'card',
-                    headerShown: false,
-                  }} 
-                />
-                <Stack.Screen 
-                  name="notifications" 
-                  options={{ 
-                    presentation: 'card',
-                    headerShown: false,
-                  }} 
-                />
-                <Stack.Screen 
-                  name="subscription" 
-                  options={{ 
-                    presentation: 'card',
-                    headerShown: false,
-                  }} 
-                />
-                <Stack.Screen 
-                  name="payment-methods" 
-                  options={{ 
-                    presentation: 'card',
-                    headerShown: false,
-                  }} 
-                />
-                <Stack.Screen name="modal" options={{ presentation: "modal" }} />
-                <Stack.Screen
-                  name="formsheet"
-                  options={{
-                    presentation: "formSheet",
-                    sheetAllowedDetents: [0.5, 1],
-                    sheetGrabberVisible: true,
-                  }}
-                />
-                <Stack.Screen
-                  name="transparent-modal"
-                  options={{
-                    presentation: "transparentModal",
-                    animation: "fade",
-                  }}
-                />
-              </Stack>
+              <RootLayoutNav />
               <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
             </ThemeProvider>
           </WidgetProvider>

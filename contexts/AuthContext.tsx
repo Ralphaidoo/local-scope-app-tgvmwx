@@ -32,6 +32,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
         console.log('Error getting initial session:', error);
+        setIsLoading(false);
+        return;
       }
       console.log('Initial session:', session?.user?.id);
       setSession(session);
@@ -68,6 +70,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.log('Error loading profile:', error);
+        
+        // If profile doesn't exist, this might be a new user
+        if (error.code === 'PGRST116') {
+          console.log('Profile not found for user, might be a new signup');
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+        
         throw error;
       }
 
@@ -84,9 +95,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           businessListingCount: profile.business_listing_count || 0,
         };
         setUser(userData);
+      } else {
+        console.log('No profile data returned');
+        setUser(null);
       }
     } catch (error) {
       console.log('Error in loadUserProfile:', error);
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
@@ -94,6 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = async () => {
     if (session?.user?.id) {
+      setIsLoading(true);
       await loadUserProfile(session.user.id);
     }
   };
