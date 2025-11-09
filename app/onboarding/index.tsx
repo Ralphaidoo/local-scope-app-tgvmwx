@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@react-navigation/native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
 import { GlassView } from 'expo-glass-effect';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,9 +11,14 @@ import { UserType } from '@/types';
 
 export default function OnboardingScreen() {
   const theme = useTheme();
-  const { user, updateProfile } = useAuth();
+  const { signup, updateProfile, user } = useAuth();
+  const params = useLocalSearchParams();
   const [selectedType, setSelectedType] = useState<UserType | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const email = params.email as string;
+  const password = params.password as string;
+  const fullName = params.fullName as string;
 
   const handleContinue = async () => {
     if (!selectedType) {
@@ -23,23 +28,32 @@ export default function OnboardingScreen() {
 
     try {
       setIsLoading(true);
+      console.log('=== ONBOARDING START ===');
+      console.log('Selected type:', selectedType);
       
-      // Update the user profile with the selected type
-      await updateProfile({
-        userType: selectedType,
-      });
+      if (!user) {
+        console.log('No user yet, signing up...');
+        await signup(email, password, fullName, selectedType);
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } else {
+        console.log('User exists, updating profile...');
+        await updateProfile({
+          userType: selectedType,
+        });
+      }
 
-      // Mark onboarding as complete
-      console.log('Onboarding complete, user type:', selectedType);
+      console.log('Onboarding complete, navigating...');
       
-      // Navigate based on user type
       if (selectedType === 'admin') {
         router.replace('/(tabs)/admin');
       } else if (selectedType === 'business_user') {
         router.replace('/(tabs)/dashboard');
       } else {
-        router.replace('/(tabs)');
+        router.replace('/(tabs)/(home)/');
       }
+      
+      console.log('=== ONBOARDING END ===');
     } catch (error) {
       console.error('Error completing onboarding:', error);
       Alert.alert('Error', 'Failed to complete onboarding. Please try again.');

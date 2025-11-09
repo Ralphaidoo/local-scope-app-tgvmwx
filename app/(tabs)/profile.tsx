@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Platform, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@react-navigation/native';
@@ -13,16 +13,12 @@ export default function ProfileScreen() {
   const { user, logout, getBusinessLimit, canAddBusiness, isLoading, refreshUser } = useAuth();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
 
-  // Log user data whenever it changes
-  React.useEffect(() => {
-    console.log('=== PROFILE SCREEN USER DATA ===');
-    console.log('User:', JSON.stringify(user, null, 2));
+  useEffect(() => {
+    console.log('=== PROFILE SCREEN MOUNT ===');
+    console.log('User:', user);
     console.log('User Type:', user?.userType);
-    console.log('Is Admin:', user?.userType === 'admin');
-    console.log('Is Business User:', user?.userType === 'business_user');
-    console.log('Is Customer:', user?.userType === 'customer');
-    console.log('================================');
-  }, [user]);
+    console.log('Is Loading:', isLoading);
+  }, [user, isLoading]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -38,7 +34,7 @@ export default function ProfileScreen() {
               await logout();
               router.replace('/auth');
             } catch (error) {
-              console.log('Logout error:', error);
+              console.error('Logout error:', error);
               Alert.alert('Error', 'Failed to logout. Please try again.');
             }
           },
@@ -49,16 +45,13 @@ export default function ProfileScreen() {
 
   const handleRefreshProfile = async () => {
     try {
-      console.log('=== REFRESH BUTTON CLICKED ===');
-      console.log('User before refresh:', JSON.stringify(user, null, 2));
+      console.log('=== MANUAL REFRESH START ===');
       setIsRefreshing(true);
       await refreshUser();
-      // Wait a bit for the state to update
-      await new Promise(resolve => setTimeout(resolve, 100));
-      console.log('User after refresh:', JSON.stringify(user, null, 2));
       Alert.alert('Success', 'Profile refreshed successfully!');
+      console.log('=== MANUAL REFRESH END ===');
     } catch (error) {
-      console.log('Refresh error:', error);
+      console.error('Refresh error:', error);
       Alert.alert('Error', 'Failed to refresh profile. Please try again.');
     } finally {
       setIsRefreshing(false);
@@ -85,7 +78,6 @@ export default function ProfileScreen() {
     router.push('/business-management');
   };
 
-  // Show loading state
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
@@ -99,7 +91,6 @@ export default function ProfileScreen() {
     );
   }
 
-  // Show error state if no user data
   if (!user) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
@@ -113,6 +104,17 @@ export default function ProfileScreen() {
           </Text>
           <Pressable
             style={styles.retryButton}
+            onPress={handleRefreshProfile}
+            disabled={isRefreshing}
+          >
+            {isRefreshing ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.retryButtonText}>Refresh Profile</Text>
+            )}
+          </Pressable>
+          <Pressable
+            style={[styles.retryButton, { backgroundColor: '#FF3B30', marginTop: 12 }]}
             onPress={() => {
               logout();
               router.replace('/auth');
@@ -132,9 +134,6 @@ export default function ProfileScreen() {
   const isBusinessUser = user?.userType === 'business_user';
   const isCustomer = user?.userType === 'customer';
 
-  console.log('Profile Screen Render - User Type:', user?.userType, 'Is Admin:', isAdmin, 'Is Business:', isBusinessUser, 'Is Customer:', isCustomer);
-
-  // Determine the display text and styling for user type
   const getUserTypeDisplay = () => {
     if (user.userType === 'admin') {
       return { label: 'Administrator', color: '#FF3B30', icon: 'shield.fill' };
@@ -151,7 +150,6 @@ export default function ProfileScreen() {
     <SafeAreaView 
       style={[styles.safeArea, { backgroundColor: theme.colors.background }]} 
       edges={['top']}
-      key={`profile-${user.id}-${user.userType}`}
     >
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Profile</Text>
@@ -178,7 +176,6 @@ export default function ProfileScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* User Info Card */}
         <GlassView
           style={[
             styles.userCard,
@@ -207,7 +204,6 @@ export default function ProfileScreen() {
             </Text>
           </View>
           
-          {/* Edit Profile Button */}
           <Pressable
             style={[styles.editProfileButton, { backgroundColor: '#007AFF' }]}
             onPress={() => router.push('/profile/edit')}
@@ -217,7 +213,6 @@ export default function ProfileScreen() {
           </Pressable>
         </GlassView>
 
-        {/* Admin Portal Link (for admin users) */}
         {isAdmin && (
           <Pressable onPress={() => router.push('/(tabs)/admin')}>
             <GlassView
@@ -245,7 +240,6 @@ export default function ProfileScreen() {
           </Pressable>
         )}
 
-        {/* Business Dashboard Link (for business users and admins) */}
         {(isBusinessUser || isAdmin) && (
           <Pressable onPress={() => router.push('/(tabs)/dashboard')}>
             <GlassView
@@ -273,7 +267,6 @@ export default function ProfileScreen() {
           </Pressable>
         )}
 
-        {/* Add Business Button (for business users and admins) */}
         {(isBusinessUser || isAdmin) && (
           <Pressable onPress={handleAddBusiness}>
             <GlassView
@@ -301,7 +294,6 @@ export default function ProfileScreen() {
           </Pressable>
         )}
 
-        {/* Subscription Card (for business users and admins) */}
         {(isBusinessUser || isAdmin) && (
           <GlassView
             style={[
@@ -375,7 +367,6 @@ export default function ProfileScreen() {
           </GlassView>
         )}
 
-        {/* Menu Items */}
         <View style={styles.menuSection}>
           <Pressable onPress={() => router.push('/settings')}>
             <GlassView
@@ -470,29 +461,27 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
 
-        {/* Debug Info (only visible in development) */}
         {__DEV__ && (
           <View style={styles.debugSection}>
             <Text style={[styles.debugTitle, { color: theme.colors.text }]}>Debug Info</Text>
             <Text style={[styles.debugText, { color: theme.dark ? '#98989D' : '#666' }]}>
+              User ID: {user.id}
+            </Text>
+            <Text style={[styles.debugText, { color: theme.dark ? '#98989D' : '#666' }]}>
               User Type: {user.userType}
-            </Text>
-            <Text style={[styles.debugText, { color: theme.dark ? '#98989D' : '#666' }]}>
-              Is Admin: {isAdmin ? 'Yes' : 'No'}
-            </Text>
-            <Text style={[styles.debugText, { color: theme.dark ? '#98989D' : '#666' }]}>
-              Is Business User: {isBusinessUser ? 'Yes' : 'No'}
-            </Text>
-            <Text style={[styles.debugText, { color: theme.dark ? '#98989D' : '#666' }]}>
-              Is Customer: {isCustomer ? 'Yes' : 'No'}
             </Text>
             <Text style={[styles.debugText, { color: theme.dark ? '#98989D' : '#666' }]}>
               Email: {user.email}
             </Text>
+            <Text style={[styles.debugText, { color: theme.dark ? '#98989D' : '#666' }]}>
+              Full Name: {user.fullName}
+            </Text>
+            <Text style={[styles.debugText, { color: theme.dark ? '#98989D' : '#666' }]}>
+              Subscription: {user.subscriptionPlan}
+            </Text>
           </View>
         )}
 
-        {/* App Info */}
         <View style={styles.appInfo}>
           <Text style={[styles.appInfoText, { color: theme.dark ? '#666' : '#999' }]}>
             Local Scope v1.0.0

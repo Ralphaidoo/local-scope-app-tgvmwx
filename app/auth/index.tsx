@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@react-navigation/native';
@@ -9,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function AuthScreen() {
   const theme = useTheme();
-  const { login, signup, user } = useAuth(); // include user here
+  const { login, signup, user, isLoading: authLoading } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,11 +18,28 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // --- UPDATED HANDLE SUBMIT ---
+  useEffect(() => {
+    console.log('Auth Screen - User changed:', user?.email, user?.userType);
+    
+    if (user && !loading) {
+      console.log('User is authenticated, redirecting based on type:', user.userType);
+      
+      if (user.userType === 'admin') {
+        console.log('Redirecting to admin dashboard');
+        router.replace('/(tabs)/admin');
+      } else if (user.userType === 'business_user') {
+        console.log('Redirecting to business dashboard');
+        router.replace('/(tabs)/dashboard');
+      } else {
+        console.log('Redirecting to home');
+        router.replace('/(tabs)/(home)/');
+      }
+    }
+  }, [user, loading]);
+
   const handleSubmit = async () => {
     setError('');
 
-    // Validation
     if (!email || !password) {
       setError('Please enter email and password');
       return;
@@ -41,27 +59,22 @@ export default function AuthScreen() {
 
     try {
       if (isLogin) {
-        // Log in
+        console.log('Logging in...');
         await login(email, password);
-
-        // Wait briefly to ensure profile loads from context
-        await new Promise((r) => setTimeout(r, 600));
-
-        // Redirect based on role
-        if (user?.userType === 'admin' || user?.user_type === 'admin') {
-          router.replace('/admin');
-        } else {
-          router.replace('/(tabs)/(home)/');
-        }
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        console.log('Login complete, waiting for redirect...');
       } else {
-        // Signup → go to onboarding
+        console.log('Signing up, redirecting to onboarding...');
         router.push({
           pathname: '/onboarding',
           params: { email, password, fullName },
         });
       }
-    } catch (err) {
-      console.log('Auth error:', err);
+    } catch (err: any) {
+      console.error('Auth error:', err);
+      
       if (
         !err?.message?.includes('Email not confirmed') &&
         !err?.message?.includes('Invalid login credentials')
@@ -73,7 +86,16 @@ export default function AuthScreen() {
     }
   };
 
-  // --- REST OF YOUR COMPONENT ---
+  if (authLoading) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -172,16 +194,58 @@ export default function AuthScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1 },
-  scrollContent: { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 32 },
-  header: { marginBottom: 32 },
-  title: { fontSize: 32, fontWeight: 'bold', marginBottom: 8 },
-  subtitle: { fontSize: 16 },
-  formContainer: { padding: 24, borderRadius: 16, marginBottom: 24 },
-  inputGroup: { marginBottom: 20 },
-  label: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
-  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16 },
-  errorText: { color: '#FF3B30', fontSize: 14, marginBottom: 16 },
+  safeArea: { 
+    flex: 1 
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+  },
+  scrollContent: { 
+    flexGrow: 1, 
+    paddingHorizontal: 24, 
+    paddingVertical: 32 
+  },
+  header: { 
+    marginBottom: 32 
+  },
+  title: { 
+    fontSize: 32, 
+    fontWeight: 'bold', 
+    marginBottom: 8 
+  },
+  subtitle: { 
+    fontSize: 16 
+  },
+  formContainer: { 
+    padding: 24, 
+    borderRadius: 16, 
+    marginBottom: 24 
+  },
+  inputGroup: { 
+    marginBottom: 20 
+  },
+  label: { 
+    fontSize: 14, 
+    fontWeight: '600', 
+    marginBottom: 8 
+  },
+  input: { 
+    borderWidth: 1, 
+    borderRadius: 12, 
+    paddingHorizontal: 16, 
+    paddingVertical: 12, 
+    fontSize: 16 
+  },
+  errorText: { 
+    color: '#FF3B30', 
+    fontSize: 14, 
+    marginBottom: 16 
+  },
   submitButton: {
     backgroundColor: '#007AFF',
     paddingVertical: 16,
@@ -189,10 +253,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
-  submitButtonDisabled: { opacity: 0.6 },
-  submitButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  switchButton: { marginTop: 16, alignItems: 'center' },
-  switchButtonText: { fontSize: 14, fontWeight: '500' },
-  footer: { marginTop: 'auto', paddingTop: 24 },
-  footerText: { fontSize: 12, textAlign: 'center', lineHeight: 18 },
+  submitButtonDisabled: { 
+    opacity: 0.6 
+  },
+  submitButtonText: { 
+    color: '#fff', 
+    fontSize: 16, 
+    fontWeight: '600' 
+  },
+  switchButton: { 
+    marginTop: 16, 
+    alignItems: 'center' 
+  },
+  switchButtonText: { 
+    fontSize: 14, 
+    fontWeight: '500' 
+  },
+  footer: { 
+    marginTop: 'auto', 
+    paddingTop: 24 
+  },
+  footerText: { 
+    fontSize: 12, 
+    textAlign: 'center', 
+    lineHeight: 18 
+  },
 });
