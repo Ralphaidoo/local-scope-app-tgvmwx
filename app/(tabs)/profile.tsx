@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function ProfileScreen() {
   const theme = useTheme();
-  const { user, logout, getBusinessLimit } = useAuth();
+  const { user, logout, getBusinessLimit, canAddBusiness } = useAuth();
 
   const handleLogout = () => {
     Alert.alert(
@@ -33,6 +33,26 @@ export default function ProfileScreen() {
         },
       ]
     );
+  };
+
+  const handleAddBusiness = () => {
+    if (!canAddBusiness()) {
+      const businessLimit = getBusinessLimit();
+      const subscriptionPlan = user?.subscriptionPlan || 'free';
+      Alert.alert(
+        'Business Limit Reached',
+        `You have reached the maximum number of businesses (${businessLimit}) for your ${subscriptionPlan} plan. ${subscriptionPlan === 'free' ? 'Upgrade to Pro to list up to 5 businesses.' : 'Please remove an existing business to add a new one.'}`,
+        [
+          { text: 'OK', style: 'cancel' },
+          ...(subscriptionPlan === 'free' ? [{
+            text: 'Upgrade to Pro',
+            onPress: () => router.push('/subscription')
+          }] : [])
+        ]
+      );
+      return;
+    }
+    router.push('/business-management');
   };
 
   const businessLimit = getBusinessLimit();
@@ -77,6 +97,34 @@ export default function ProfileScreen() {
             </Text>
           </View>
         </GlassView>
+
+        {/* Add Business Button (for business users) */}
+        {user?.userType === 'business' && (
+          <Pressable onPress={handleAddBusiness}>
+            <GlassView
+              style={[
+                styles.addBusinessCard,
+                Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
+              ]}
+              glassEffectStyle="regular"
+            >
+              <View style={styles.addBusinessContent}>
+                <View style={[styles.addBusinessIcon, { backgroundColor: '#007AFF' }]}>
+                  <IconSymbol name="plus" color="#fff" size={24} />
+                </View>
+                <View style={styles.addBusinessText}>
+                  <Text style={[styles.addBusinessTitle, { color: theme.colors.text }]}>
+                    Add New Business
+                  </Text>
+                  <Text style={[styles.addBusinessSubtitle, { color: theme.dark ? '#98989D' : '#666' }]}>
+                    {currentBusinessCount} / {businessLimit} businesses used
+                  </Text>
+                </View>
+              </View>
+              <IconSymbol name="chevron.right" color={theme.dark ? '#98989D' : '#666'} size={20} />
+            </GlassView>
+          </Pressable>
+        )}
 
         {/* Subscription Card (for business users) */}
         {user?.userType === 'business' && (
@@ -303,6 +351,39 @@ const styles = StyleSheet.create({
   userTypeText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  addBusinessCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  addBusinessContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  addBusinessIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addBusinessText: {
+    flex: 1,
+  },
+  addBusinessTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  addBusinessSubtitle: {
+    fontSize: 12,
   },
   subscriptionCard: {
     marginHorizontal: 16,

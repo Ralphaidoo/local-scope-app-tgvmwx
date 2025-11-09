@@ -9,11 +9,13 @@ import { GlassView } from 'expo-glass-effect';
 import { BusinessCategory, LondonBorough } from '@/types';
 import { categories, boroughs } from '@/data/mockData';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/app/integrations/supabase/client';
 
 export default function BusinessManagementScreen() {
   const theme = useTheme();
-  const { user, canAddBusiness, getBusinessLimit } = useAuth();
+  const { user, canAddBusiness, getBusinessLimit, refreshUser } = useAuth();
   const [step, setStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Form state
   const [businessName, setBusinessName] = useState('');
@@ -29,7 +31,7 @@ export default function BusinessManagementScreen() {
   const currentBusinessCount = user?.businessListingCount || 0;
   const subscriptionPlan = user?.subscriptionPlan || 'free';
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canAddBusiness()) {
       Alert.alert(
         'Business Limit Reached',
@@ -50,16 +52,87 @@ export default function BusinessManagementScreen() {
       return;
     }
 
-    Alert.alert(
-      'Success',
-      'Your business has been submitted for review. You will be notified once it is approved.',
-      [
-        {
-          text: 'OK',
-          onPress: () => router.back(),
-        },
-      ]
-    );
+    setIsSubmitting(true);
+
+    try {
+      console.log('Submitting business...');
+      
+      // Get user's profile ID
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (profileError || !profile) {
+        console.log('Error getting profile:', profileError);
+        throw new Error('Failed to get user profile');
+      }
+
+      console.log('Profile ID:', profile.id);
+
+      // Create business
+      const { data: business, error: businessError } = await supabase
+        .from('businesses')
+        .insert({
+          owner_id: profile.id,
+          name: businessName,
+          description: description,
+          category: category.toLowerCase().replace(/ & /g, '_').replace(/ /g, '_') as any,
+          boroughs: [borough],
+          neighborhoods: [],
+          primary_postcode: '',
+          phone: phone,
+          email: email,
+          website: website || null,
+          verified: false,
+          featured: false,
+          archived: false,
+        })
+        .select()
+        .single();
+
+      if (businessError) {
+        console.log('Error creating business:', businessError);
+        throw businessError;
+      }
+
+      console.log('Business created:', business);
+
+      // Update business listing count
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ 
+          business_listing_count: currentBusinessCount + 1 
+        })
+        .eq('user_id', user?.id);
+
+      if (updateError) {
+        console.log('Error updating business count:', updateError);
+      }
+
+      // Refresh user data
+      await refreshUser();
+
+      Alert.alert(
+        'Success',
+        'Your business has been submitted for review. You will be notified once it is approved.',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.back(),
+          },
+        ]
+      );
+    } catch (error: any) {
+      console.log('Error submitting business:', error);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to submit business. Please try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const renderStep1 = () => (
@@ -280,14 +353,24 @@ export default function BusinessManagementScreen() {
         <Pressable
           style={[styles.backButton, { borderColor: theme.dark ? '#333' : '#ddd' }]}
           onPress={() => setStep(2)}
+          disabled={isSubmitting}
         >
           <Text style={[styles.backButtonText, { color: theme.colors.text }]}>Back</Text>
         </Pressable>
         <Pressable
-          style={[styles.submitButton, { backgroundColor: '#34C759', flex: 1 }]}
+          style={[
+            styles.submitButton, 
+            { 
+              backgroundColor: isSubmitting ? '#999' : '#34C759', 
+              flex: 1 
+            }
+          ]}
           onPress={handleSubmit}
+          disabled={isSubmitting}
         >
-          <Text style={styles.submitButtonText}>Submit Business</Text>
+          <Text style={styles.submitButtonText}>
+            {isSubmitting ? 'Submitting...' : 'Submit Business'}
+          </Text>
         </Pressable>
       </View>
     </View>
