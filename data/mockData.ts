@@ -223,6 +223,7 @@ export const categories: BusinessCategory[] = [
 ];
 
 export const boroughs: LondonBorough[] = [
+  'City of London',
   'Westminster',
   'Camden',
   'Islington',
@@ -254,4 +255,5 @@ export const boroughs: LondonBorough[] = [
   'Redbridge',
   'Sutton',
   'Waltham Forest',
+  'Havering',
 ];

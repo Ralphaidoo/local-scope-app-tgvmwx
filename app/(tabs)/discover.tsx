@@ -1,88 +1,77 @@
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Platform, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@react-navigation/native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { GlassView } from 'expo-glass-effect';
 import { router } from 'expo-router';
-import { mockBusinesses, categories, boroughs } from '@/data/mockData';
+import { mockBusinesses, categories } from '@/data/mockData';
 import { BusinessCategory, LondonBorough, ViewMode } from '@/types';
+import { allBoroughs, neighborhoodsByBorough } from '@/data/neighborhoodData';
 
 export default function DiscoverScreen() {
   const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<BusinessCategory | null>(null);
-  const [selectedBorough, setSelectedBorough] = useState<LondonBorough | null>(null);
+  const [selectedBoroughs, setSelectedBoroughs] = useState<LondonBorough[]>([]);
+  const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('map');
   const [showFilters, setShowFilters] = useState(false);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [minRating, setMinRating] = useState(0);
+  const [showBoroughModal, setShowBoroughModal] = useState(false);
+  const [showNeighborhoodModal, setShowNeighborhoodModal] = useState(false);
 
   const filteredBusinesses = mockBusinesses.filter(business => {
     const matchesSearch = business.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          business.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = !selectedCategory || business.category === selectedCategory;
-    const matchesBorough = !selectedBorough || business.borough === selectedBorough;
+    const matchesBorough = selectedBoroughs.length === 0 || selectedBoroughs.includes(business.borough);
+    const matchesNeighborhood = selectedNeighborhoods.length === 0 || selectedNeighborhoods.includes(business.neighborhood);
     const matchesVerified = !verifiedOnly || business.verified;
     const matchesRating = business.rating >= minRating;
     
-    return matchesSearch && matchesCategory && matchesBorough && matchesVerified && matchesRating;
+    return matchesSearch && matchesCategory && matchesBorough && matchesNeighborhood && matchesVerified && matchesRating;
   });
 
-  // Group businesses by borough for the map view
-  const boroughBusinessCounts = boroughs.reduce((acc, borough) => {
-    acc[borough] = mockBusinesses.filter(b => b.borough === borough).length;
-    return acc;
-  }, {} as Record<LondonBorough, number>);
+  // Get available neighborhoods based on selected boroughs
+  const availableNeighborhoods = selectedBoroughs.length > 0
+    ? selectedBoroughs.flatMap(borough => neighborhoodsByBorough[borough] || [])
+    : Object.values(neighborhoodsByBorough).flat();
 
-  // Borough regions with positions for visual map
-  const boroughRegions: Array<{ name: LondonBorough; count: number; zone: string }> = [
-    // Central London
-    { name: 'Westminster', count: boroughBusinessCounts['Westminster'], zone: 'Central' },
-    { name: 'Camden', count: boroughBusinessCounts['Camden'], zone: 'Central' },
-    { name: 'Islington', count: boroughBusinessCounts['Islington'], zone: 'Central' },
-    { name: 'Kensington and Chelsea', count: boroughBusinessCounts['Kensington and Chelsea'], zone: 'Central' },
-    
-    // North London
-    { name: 'Barnet', count: boroughBusinessCounts['Barnet'], zone: 'North' },
-    { name: 'Enfield', count: boroughBusinessCounts['Enfield'], zone: 'North' },
-    { name: 'Haringey', count: boroughBusinessCounts['Haringey'], zone: 'North' },
-    
-    // East London
-    { name: 'Hackney', count: boroughBusinessCounts['Hackney'], zone: 'East' },
-    { name: 'Tower Hamlets', count: boroughBusinessCounts['Tower Hamlets'], zone: 'East' },
-    { name: 'Newham', count: boroughBusinessCounts['Newham'], zone: 'East' },
-    { name: 'Redbridge', count: boroughBusinessCounts['Redbridge'], zone: 'East' },
-    { name: 'Barking and Dagenham', count: boroughBusinessCounts['Barking and Dagenham'], zone: 'East' },
-    { name: 'Waltham Forest', count: boroughBusinessCounts['Waltham Forest'], zone: 'East' },
-    
-    // South London
-    { name: 'Southwark', count: boroughBusinessCounts['Southwark'], zone: 'South' },
-    { name: 'Lambeth', count: boroughBusinessCounts['Lambeth'], zone: 'South' },
-    { name: 'Lewisham', count: boroughBusinessCounts['Lewisham'], zone: 'South' },
-    { name: 'Greenwich', count: boroughBusinessCounts['Greenwich'], zone: 'South' },
-    { name: 'Bromley', count: boroughBusinessCounts['Bromley'], zone: 'South' },
-    { name: 'Croydon', count: boroughBusinessCounts['Croydon'], zone: 'South' },
-    { name: 'Sutton', count: boroughBusinessCounts['Sutton'], zone: 'South' },
-    { name: 'Merton', count: boroughBusinessCounts['Merton'], zone: 'South' },
-    
-    // West London
-    { name: 'Hammersmith and Fulham', count: boroughBusinessCounts['Hammersmith and Fulham'], zone: 'West' },
-    { name: 'Ealing', count: boroughBusinessCounts['Ealing'], zone: 'West' },
-    { name: 'Hounslow', count: boroughBusinessCounts['Hounslow'], zone: 'West' },
-    { name: 'Richmond upon Thames', count: boroughBusinessCounts['Richmond upon Thames'], zone: 'West' },
-    { name: 'Kingston upon Thames', count: boroughBusinessCounts['Kingston upon Thames'], zone: 'West' },
-    { name: 'Wandsworth', count: boroughBusinessCounts['Wandsworth'], zone: 'West' },
-    { name: 'Brent', count: boroughBusinessCounts['Brent'], zone: 'West' },
-    { name: 'Harrow', count: boroughBusinessCounts['Harrow'], zone: 'West' },
-    { name: 'Hillingdon', count: boroughBusinessCounts['Hillingdon'], zone: 'West' },
-    
-    // Southeast
-    { name: 'Bexley', count: boroughBusinessCounts['Bexley'], zone: 'South' },
-  ];
+  const toggleBorough = (borough: LondonBorough) => {
+    setSelectedBoroughs(prev => {
+      if (prev.includes(borough)) {
+        // Remove borough and its neighborhoods
+        const boroughNeighborhoods = neighborhoodsByBorough[borough] || [];
+        setSelectedNeighborhoods(prevNeighborhoods => 
+          prevNeighborhoods.filter(n => !boroughNeighborhoods.includes(n))
+        );
+        return prev.filter(b => b !== borough);
+      } else {
+        return [...prev, borough];
+      }
+    });
+  };
 
-  const zones = ['Central', 'North', 'East', 'South', 'West'];
+  const toggleNeighborhood = (neighborhood: string) => {
+    setSelectedNeighborhoods(prev => {
+      if (prev.includes(neighborhood)) {
+        return prev.filter(n => n !== neighborhood);
+      } else {
+        return [...prev, neighborhood];
+      }
+    });
+  };
+
+  const clearAllFilters = () => {
+    setSelectedBoroughs([]);
+    setSelectedNeighborhoods([]);
+    setSelectedCategory(null);
+    setVerifiedOnly(false);
+    setMinRating(0);
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
@@ -142,6 +131,72 @@ export default function DiscoverScreen() {
           />
         </GlassView>
 
+        {/* Location Filters */}
+        <View style={styles.locationFilters}>
+          <Pressable
+            style={[styles.locationButton, { backgroundColor: '#007AFF' }]}
+            onPress={() => setShowBoroughModal(true)}
+          >
+            <IconSymbol name="building.2" color="#FFFFFF" size={20} />
+            <Text style={styles.locationButtonText}>
+              {selectedBoroughs.length === 0 
+                ? 'Select Boroughs' 
+                : `${selectedBoroughs.length} Borough${selectedBoroughs.length > 1 ? 's' : ''}`}
+            </Text>
+            <IconSymbol name="chevron.down" color="#FFFFFF" size={16} />
+          </Pressable>
+
+          <Pressable
+            style={[
+              styles.locationButton, 
+              { backgroundColor: '#007AFF' },
+              selectedBoroughs.length === 0 && { opacity: 0.5 }
+            ]}
+            onPress={() => selectedBoroughs.length > 0 && setShowNeighborhoodModal(true)}
+            disabled={selectedBoroughs.length === 0}
+          >
+            <IconSymbol name="mappin.circle" color="#FFFFFF" size={20} />
+            <Text style={styles.locationButtonText}>
+              {selectedNeighborhoods.length === 0 
+                ? 'Select Areas' 
+                : `${selectedNeighborhoods.length} Area${selectedNeighborhoods.length > 1 ? 's' : ''}`}
+            </Text>
+            <IconSymbol name="chevron.down" color="#FFFFFF" size={16} />
+          </Pressable>
+        </View>
+
+        {/* Active Filters Display */}
+        {(selectedBoroughs.length > 0 || selectedNeighborhoods.length > 0) && (
+          <View style={styles.activeFiltersContainer}>
+            <View style={styles.activeFiltersHeader}>
+              <Text style={[styles.activeFiltersTitle, { color: theme.colors.text }]}>
+                Active Filters
+              </Text>
+              <Pressable onPress={clearAllFilters}>
+                <Text style={[styles.clearAllText, { color: '#007AFF' }]}>Clear All</Text>
+              </Pressable>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.activeFiltersScroll}>
+              {selectedBoroughs.map(borough => (
+                <View key={borough} style={[styles.activeFilterChip, { backgroundColor: '#007AFF' }]}>
+                  <Text style={styles.activeFilterChipText}>{borough}</Text>
+                  <Pressable onPress={() => toggleBorough(borough)}>
+                    <IconSymbol name="xmark.circle.fill" color="#FFFFFF" size={16} />
+                  </Pressable>
+                </View>
+              ))}
+              {selectedNeighborhoods.map(neighborhood => (
+                <View key={neighborhood} style={[styles.activeFilterChip, { backgroundColor: '#34C759' }]}>
+                  <Text style={styles.activeFilterChipText}>{neighborhood}</Text>
+                  <Pressable onPress={() => toggleNeighborhood(neighborhood)}>
+                    <IconSymbol name="xmark.circle.fill" color="#FFFFFF" size={16} />
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Filters */}
         {showFilters && (
           <GlassView
@@ -151,7 +206,7 @@ export default function DiscoverScreen() {
             ]}
             glassEffectStyle="regular"
           >
-            <Text style={[styles.filterTitle, { color: theme.colors.text }]}>Filters</Text>
+            <Text style={[styles.filterTitle, { color: theme.colors.text }]}>Additional Filters</Text>
             
             {/* Category Filter */}
             <Text style={[styles.filterLabel, { color: theme.dark ? '#98989D' : '#666' }]}>Category</Text>
@@ -159,7 +214,7 @@ export default function DiscoverScreen() {
               <Pressable
                 style={[
                   styles.filterChip,
-                  !selectedCategory && styles.filterChipActive,
+                  !selectedCategory && { backgroundColor: '#007AFF', borderColor: '#007AFF' },
                   { borderColor: theme.dark ? '#333' : '#ddd' }
                 ]}
                 onPress={() => setSelectedCategory(null)}
@@ -176,7 +231,7 @@ export default function DiscoverScreen() {
                   key={category}
                   style={[
                     styles.filterChip,
-                    selectedCategory === category && styles.filterChipActive,
+                    selectedCategory === category && { backgroundColor: '#007AFF', borderColor: '#007AFF' },
                     { borderColor: theme.dark ? '#333' : '#ddd' }
                   ]}
                   onPress={() => setSelectedCategory(category)}
@@ -216,7 +271,7 @@ export default function DiscoverScreen() {
                     key={rating}
                     style={[
                       styles.ratingButton,
-                      minRating === rating && styles.ratingButtonActive,
+                      minRating === rating && { backgroundColor: '#007AFF', borderColor: '#007AFF' },
                       { borderColor: theme.dark ? '#333' : '#ddd' }
                     ]}
                     onPress={() => setMinRating(rating)}
@@ -235,104 +290,63 @@ export default function DiscoverScreen() {
         )}
 
         {/* Results Header */}
-        {selectedBorough && (
-          <View style={styles.selectedBoroughHeader}>
-            <GlassView
-              style={[
-                styles.selectedBoroughBadge,
-                Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
-              ]}
-              glassEffectStyle="regular"
-            >
-              <IconSymbol name="mappin.circle.fill" color="#007AFF" size={20} />
-              <Text style={[styles.selectedBoroughText, { color: theme.colors.text }]}>
-                {selectedBorough}
-              </Text>
-              <Pressable onPress={() => setSelectedBorough(null)}>
-                <IconSymbol name="xmark.circle.fill" color={theme.dark ? '#98989D' : '#666'} size={20} />
-              </Pressable>
-            </GlassView>
-          </View>
-        )}
-
         <View style={styles.resultsHeader}>
           <Text style={[styles.resultsText, { color: theme.dark ? '#98989D' : '#666' }]}>
             {filteredBusinesses.length} {filteredBusinesses.length === 1 ? 'business' : 'businesses'} found
           </Text>
         </View>
 
-        {/* Map View - Borough Selector */}
+        {/* Map View - Visual Borough Map */}
         {viewMode === 'map' && (
           <View style={styles.mapContainer}>
+            <View style={[styles.mapNotice, { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+              <IconSymbol name="info.circle" color="#007AFF" size={20} />
+              <Text style={[styles.mapNoticeText, { color: theme.colors.text }]}>
+                Interactive maps (react-native-maps) are not supported on web in Natively. 
+                Use the borough and area selectors above to filter businesses by location.
+              </Text>
+            </View>
+            
             <Text style={[styles.mapTitle, { color: theme.colors.text }]}>
-              Select a Borough or Area
+              London Boroughs Map
             </Text>
             <Text style={[styles.mapSubtitle, { color: theme.dark ? '#98989D' : '#666' }]}>
-              Tap on any zone to see businesses in that area
+              Use the buttons above to select boroughs and areas
             </Text>
             
-            {zones.map(zone => (
-              <View key={zone} style={styles.zoneSection}>
-                <Text style={[styles.zoneTitle, { color: theme.colors.text }]}>
-                  {zone} London
-                </Text>
-                <View style={styles.boroughGrid}>
-                  {boroughRegions
-                    .filter(region => region.zone === zone)
-                    .map(region => (
-                      <Pressable
-                        key={region.name}
-                        onPress={() => {
-                          setSelectedBorough(region.name);
-                          setViewMode('list');
-                        }}
-                      >
-                        <GlassView
-                          style={[
-                            styles.boroughCard,
-                            selectedBorough === region.name && styles.boroughCardSelected,
-                            Platform.OS !== 'ios' && { 
-                              backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' 
-                            }
-                          ]}
-                          glassEffectStyle="regular"
-                        >
-                          <View style={styles.boroughCardHeader}>
-                            <IconSymbol 
-                              name="building.2.fill" 
-                              color={selectedBorough === region.name ? '#007AFF' : theme.dark ? '#98989D' : '#666'} 
-                              size={24} 
-                            />
-                            <View style={[
-                              styles.boroughBadge,
-                              { backgroundColor: selectedBorough === region.name ? '#007AFF' : theme.dark ? '#333' : '#ddd' }
-                            ]}>
-                              <Text style={[
-                                styles.boroughBadgeText,
-                                { color: selectedBorough === region.name ? '#fff' : theme.colors.text }
-                              ]}>
-                                {region.count}
-                              </Text>
-                            </View>
-                          </View>
-                          <Text 
-                            style={[
-                              styles.boroughName, 
-                              { color: selectedBorough === region.name ? '#007AFF' : theme.colors.text }
-                            ]}
-                            numberOfLines={2}
-                          >
-                            {region.name}
-                          </Text>
-                          <Text style={[styles.boroughCount, { color: theme.dark ? '#98989D' : '#666' }]}>
-                            {region.count} {region.count === 1 ? 'business' : 'businesses'}
-                          </Text>
-                        </GlassView>
-                      </Pressable>
-                    ))}
-                </View>
-              </View>
-            ))}
+            {/* Visual representation of London zones */}
+            <View style={styles.londonMapVisual}>
+              {['Central', 'North', 'East', 'South', 'West'].map(zone => {
+                const zoneBoroughs = allBoroughs.filter(borough => {
+                  if (zone === 'Central') return ['Westminster', 'Camden', 'Islington', 'Kensington and Chelsea', 'City of London'].includes(borough);
+                  if (zone === 'North') return ['Barnet', 'Enfield', 'Haringey'].includes(borough);
+                  if (zone === 'East') return ['Hackney', 'Tower Hamlets', 'Newham', 'Redbridge', 'Barking and Dagenham', 'Waltham Forest', 'Havering'].includes(borough);
+                  if (zone === 'South') return ['Southwark', 'Lambeth', 'Lewisham', 'Greenwich', 'Bromley', 'Croydon', 'Sutton', 'Merton', 'Bexley'].includes(borough);
+                  if (zone === 'West') return ['Hammersmith and Fulham', 'Ealing', 'Hounslow', 'Richmond upon Thames', 'Kingston upon Thames', 'Wandsworth', 'Brent', 'Harrow', 'Hillingdon'].includes(borough);
+                  return false;
+                });
+                
+                const selectedCount = zoneBoroughs.filter(b => selectedBoroughs.includes(b)).length;
+                
+                return (
+                  <View key={zone} style={styles.zoneCard}>
+                    <View style={styles.zoneHeader}>
+                      <Text style={[styles.zoneTitle, { color: theme.colors.text }]}>
+                        {zone} London
+                      </Text>
+                      {selectedCount > 0 && (
+                        <View style={[styles.zoneBadge, { backgroundColor: '#007AFF' }]}>
+                          <Text style={styles.zoneBadgeText}>{selectedCount}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={[styles.zoneSubtitle, { color: theme.dark ? '#98989D' : '#666' }]}>
+                      {zoneBoroughs.length} boroughs
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
           </View>
         )}
 
@@ -414,6 +428,126 @@ export default function DiscoverScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Borough Selection Modal */}
+      <Modal
+        visible={showBoroughModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowBoroughModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.background }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                Select Boroughs
+              </Text>
+              <Pressable onPress={() => setShowBoroughModal(false)}>
+                <IconSymbol name="xmark.circle.fill" color={theme.dark ? '#98989D' : '#666'} size={28} />
+              </Pressable>
+            </View>
+            
+            <ScrollView style={styles.modalScroll}>
+              {allBoroughs.map(borough => (
+                <Pressable
+                  key={borough}
+                  style={styles.checkboxRow}
+                  onPress={() => toggleBorough(borough)}
+                >
+                  <View style={styles.checkboxContainer}>
+                    <View style={[
+                      styles.checkbox,
+                      { borderColor: theme.dark ? '#666' : '#ccc' },
+                      selectedBoroughs.includes(borough) && { backgroundColor: '#007AFF', borderColor: '#007AFF' }
+                    ]}>
+                      {selectedBoroughs.includes(borough) && (
+                        <IconSymbol name="checkmark" color="#FFFFFF" size={16} />
+                      )}
+                    </View>
+                    <Text style={[styles.checkboxLabel, { color: theme.colors.text }]}>
+                      {borough}
+                    </Text>
+                  </View>
+                  <Text style={[styles.neighborhoodCount, { color: theme.dark ? '#98989D' : '#666' }]}>
+                    {(neighborhoodsByBorough[borough] || []).length} areas
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            
+            <View style={styles.modalFooter}>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: '#007AFF' }]}
+                onPress={() => setShowBoroughModal(false)}
+              >
+                <Text style={styles.modalButtonText}>Done</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Neighborhood Selection Modal */}
+      <Modal
+        visible={showNeighborhoodModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowNeighborhoodModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.background }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                Select Areas
+              </Text>
+              <Pressable onPress={() => setShowNeighborhoodModal(false)}>
+                <IconSymbol name="xmark.circle.fill" color={theme.dark ? '#98989D' : '#666'} size={28} />
+              </Pressable>
+            </View>
+            
+            <ScrollView style={styles.modalScroll}>
+              {selectedBoroughs.map(borough => (
+                <View key={borough} style={styles.boroughSection}>
+                  <Text style={[styles.boroughSectionTitle, { color: theme.colors.text }]}>
+                    {borough}
+                  </Text>
+                  {(neighborhoodsByBorough[borough] || []).map(neighborhood => (
+                    <Pressable
+                      key={neighborhood}
+                      style={styles.checkboxRow}
+                      onPress={() => toggleNeighborhood(neighborhood)}
+                    >
+                      <View style={styles.checkboxContainer}>
+                        <View style={[
+                          styles.checkbox,
+                          { borderColor: theme.dark ? '#666' : '#ccc' },
+                          selectedNeighborhoods.includes(neighborhood) && { backgroundColor: '#34C759', borderColor: '#34C759' }
+                        ]}>
+                          {selectedNeighborhoods.includes(neighborhood) && (
+                            <IconSymbol name="checkmark" color="#FFFFFF" size={16} />
+                          )}
+                        </View>
+                        <Text style={[styles.checkboxLabel, { color: theme.colors.text }]}>
+                          {neighborhood}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              ))}
+            </ScrollView>
+            
+            <View style={styles.modalFooter}>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: '#007AFF' }]}
+                onPress={() => setShowNeighborhoodModal(false)}
+              >
+                <Text style={styles.modalButtonText}>Done</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -460,6 +594,63 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
   },
+  locationFilters: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    gap: 12,
+    marginBottom: 16,
+  },
+  locationButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  locationButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+  },
+  activeFiltersContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  activeFiltersHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  activeFiltersTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  clearAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  activeFiltersScroll: {
+    flexDirection: 'row',
+  },
+  activeFilterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+    gap: 6,
+  },
+  activeFilterChipText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '500',
+  },
   filtersContainer: {
     marginHorizontal: 16,
     marginBottom: 16,
@@ -487,10 +678,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginRight: 8,
   },
-  filterChipActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
   filterChipText: {
     fontSize: 14,
     fontWeight: '500',
@@ -514,28 +701,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
   },
-  ratingButtonActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
   ratingButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  selectedBoroughHeader: {
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
-  selectedBoroughBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  selectedBoroughText: {
     fontSize: 14,
     fontWeight: '500',
   },
@@ -550,6 +716,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 16,
   },
+  mapNotice: {
+    flexDirection: 'row',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 12,
+  },
+  mapNoticeText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
   mapTitle: {
     fontSize: 20,
     fontWeight: '600',
@@ -559,52 +737,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 20,
   },
-  zoneSection: {
-    marginBottom: 24,
+  londonMapVisual: {
+    gap: 12,
+  },
+  zoneCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 122, 255, 0.3)',
+  },
+  zoneHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   zoneTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 12,
   },
-  boroughGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  boroughCard: {
-    width: 160,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  boroughCardSelected: {
-    borderWidth: 2,
-    borderColor: '#007AFF',
-  },
-  boroughCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  boroughBadge: {
+  zoneBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  boroughBadgeText: {
+  zoneBadgeText: {
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
   },
-  boroughName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-    minHeight: 40,
-  },
-  boroughCount: {
-    fontSize: 12,
+  zoneSubtitle: {
+    fontSize: 14,
   },
   businessCard: {
     marginHorizontal: 16,
@@ -678,5 +841,82 @@ const styles = StyleSheet.create({
   },
   gridRatingText: {
     fontSize: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  modalScroll: {
+    maxHeight: 400,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxLabel: {
+    fontSize: 16,
+    flex: 1,
+  },
+  neighborhoodCount: {
+    fontSize: 14,
+  },
+  boroughSection: {
+    paddingVertical: 8,
+  },
+  boroughSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  modalFooter: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  modalButton: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

@@ -72,6 +72,7 @@ export type BusinessCategory =
   | 'Automotive';
 
 export type LondonBorough = 
+  | 'City of London'
   | 'Westminster'
   | 'Camden'
   | 'Islington'
@@ -102,7 +103,8 @@ export type LondonBorough =
   | 'Newham'
   | 'Redbridge'
   | 'Sutton'
-  | 'Waltham Forest';
+  | 'Waltham Forest'
+  | 'Havering';
 
 export interface Product {
   id: string;
