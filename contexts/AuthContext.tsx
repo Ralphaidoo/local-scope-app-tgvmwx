@@ -34,9 +34,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('Loading profile for user_id:', userId);
     
     try {
+      // Removed 'role' from the select query to avoid issues
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, user_id, email, full_name, user_type, role, subscription_plan, business_listing_count, phone, created_at')
+        .select('id, user_id, email, full_name, user_type, subscription_plan, business_listing_count, phone, created_at')
         .eq('user_id', userId)
         .maybeSingle();
 
@@ -44,27 +45,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error('Profile fetch error:', error);
+        Alert.alert('Profile Error', 'Failed to load your profile. Please try logging in again.');
         return;
       }
 
       if (data) {
         console.log('Profile data found:', data);
         console.log('User type from DB:', data.user_type);
-        console.log('Role from DB:', data.role);
-
-        // Prioritize role field if it exists and is 'admin', otherwise use user_type
-        let finalUserType = data.user_type as UserType;
-        
-        if (data.role === 'admin' || data.user_type === 'admin') {
-          finalUserType = 'admin';
-          console.log('ADMIN USER DETECTED - Setting userType to admin');
-        }
 
         const userProfile: User = {
           id: data.id,
           email: data.email || '',
           fullName: data.full_name || '',
-          userType: finalUserType,
+          userType: data.user_type as UserType,
           phone: data.phone,
           createdAt: data.created_at || new Date().toISOString(),
           subscriptionPlan: (data.subscription_plan as SubscriptionPlan) || 'free',
@@ -81,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error('Exception in loadProfile:', err);
+      Alert.alert('Error', 'An unexpected error occurred while loading your profile.');
     }
     
     console.log('=== LOAD PROFILE END ===');
@@ -196,12 +190,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Login successful, user_id:', data.user?.id);
       
       if (data.session?.user?.id) {
-        // Wait a bit longer to ensure the profile is created/updated
-        await new Promise(resolve => setTimeout(resolve, 800));
-        await loadProfile(data.session.user.id);
-        
-        // Force a second load to ensure we have the latest data
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Wait a bit to ensure the profile is created/updated
+        await new Promise(resolve => setTimeout(resolve, 500));
         await loadProfile(data.session.user.id);
       }
       
@@ -238,17 +228,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Signup successful, user_id:', authData.user?.id);
       
       if (authData.session?.user?.id) {
-        await new Promise(resolve => setTimeout(resolve, 800));
-        await loadProfile(authData.session.user.id);
-        
-        // Force a second load to ensure we have the latest data
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 500));
         await loadProfile(authData.session.user.id);
       }
 
       Alert.alert(
         'Verify Your Email',
-        'We\'ve sent a verification link to your email. Please check your inbox or spam folder.',
+        'We\'ve sent a verification link to your email. Please check your inbox or spam folder and verify your email before signing in.',
         [{ text: 'OK' }]
       );
       
@@ -295,6 +281,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (updates.phone !== undefined) profileUpdates.phone = updates.phone;
       if (updates.userType !== undefined) {
         profileUpdates.user_type = updates.userType;
+        // Keep role in sync with user_type for backward compatibility
         profileUpdates.role = updates.userType;
       }
       if (updates.subscriptionPlan !== undefined) {
@@ -321,6 +308,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('=== UPDATE PROFILE END ===');
     } catch (error: any) {
       console.error('Update profile error:', error);
+      Alert.alert('Update Failed', error.message || 'Could not update profile');
       throw error;
     }
   };
@@ -352,8 +340,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       console.log('Subscription upgraded successfully');
       console.log('=== UPGRADE SUBSCRIPTION END ===');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upgrade subscription error:', error);
+      Alert.alert('Upgrade Failed', error.message || 'Could not upgrade subscription');
       throw error;
     }
   };
