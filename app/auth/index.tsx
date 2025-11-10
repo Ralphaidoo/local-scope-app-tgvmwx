@@ -19,23 +19,31 @@ export default function AuthScreen() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    console.log('Auth Screen - User changed:', user?.email, user?.userType);
+    console.log('=== AUTH SCREEN EFFECT ===');
+    console.log('User:', user?.email);
+    console.log('User Type:', user?.userType);
+    console.log('Loading:', loading);
+    console.log('Auth Loading:', authLoading);
     
-    if (user && !loading) {
+    // Only redirect if we have a user and we're not in the middle of a login/signup operation
+    if (user && !loading && !authLoading) {
       console.log('User is authenticated, redirecting based on type:', user.userType);
       
-      if (user.userType === 'admin') {
-        console.log('Redirecting to admin dashboard');
-        router.replace('/(tabs)/admin');
-      } else if (user.userType === 'business_user') {
-        console.log('Redirecting to business dashboard');
-        router.replace('/(tabs)/dashboard');
-      } else {
-        console.log('Redirecting to home');
-        router.replace('/(tabs)/(home)/');
-      }
+      // Use setTimeout to ensure state updates have completed
+      setTimeout(() => {
+        if (user.userType === 'admin') {
+          console.log('Redirecting admin to admin dashboard');
+          router.replace('/(tabs)/admin');
+        } else if (user.userType === 'business_user') {
+          console.log('Redirecting business user to dashboard');
+          router.replace('/(tabs)/dashboard');
+        } else {
+          console.log('Redirecting customer to home');
+          router.replace('/(tabs)/(home)/');
+        }
+      }, 100);
     }
-  }, [user, loading]);
+  }, [user, loading, authLoading]);
 
   const handleSubmit = async () => {
     setError('');
@@ -59,14 +67,17 @@ export default function AuthScreen() {
 
     try {
       if (isLogin) {
-        console.log('Logging in...');
+        console.log('=== STARTING LOGIN PROCESS ===');
         await login(email, password);
         
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Wait for the user state to update
+        console.log('Login complete, waiting for user state update...');
+        await new Promise(resolve => setTimeout(resolve, 1500));
         
-        console.log('Login complete, waiting for redirect...');
+        console.log('Login process complete');
       } else {
-        console.log('Signing up, redirecting to onboarding...');
+        console.log('=== STARTING SIGNUP PROCESS ===');
+        console.log('Redirecting to onboarding...');
         router.push({
           pathname: '/onboarding',
           params: { email, password, fullName },

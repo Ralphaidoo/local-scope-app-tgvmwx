@@ -40,13 +40,13 @@ function RootLayoutNav() {
 
     const inAuthGroup = segments[0] === 'auth' || segments[0] === 'onboarding' || segments[0] === 'email-confirmed';
     
-    console.log('Auth guard check:', { 
-      isAuthenticated, 
-      hasUser: !!user, 
-      hasSession: !!session,
-      segments, 
-      inAuthGroup 
-    });
+    console.log('=== ROOT LAYOUT AUTH GUARD ===');
+    console.log('isAuthenticated:', isAuthenticated);
+    console.log('hasUser:', !!user);
+    console.log('hasSession:', !!session);
+    console.log('userType:', user?.userType);
+    console.log('segments:', segments);
+    console.log('inAuthGroup:', inAuthGroup);
 
     // Only redirect if we have a clear auth state
     if (!session && !inAuthGroup) {
@@ -57,10 +57,20 @@ function RootLayoutNav() {
       // Has session but no user yet (still loading profile) - wait
       console.log('Waiting for profile to load');
       return;
-    } else if (isAuthenticated && inAuthGroup) {
-      // User is authenticated and in auth flow - redirect to home
-      console.log('Redirecting to home - user authenticated');
-      router.replace('/(tabs)/(home)/');
+    } else if (isAuthenticated && user && inAuthGroup) {
+      // User is authenticated and in auth flow - redirect based on user type
+      console.log('User authenticated in auth flow, redirecting based on type');
+      
+      if (user.userType === 'admin') {
+        console.log('Redirecting admin to admin dashboard');
+        router.replace('/(tabs)/admin');
+      } else if (user.userType === 'business_user') {
+        console.log('Redirecting business user to dashboard');
+        router.replace('/(tabs)/dashboard');
+      } else {
+        console.log('Redirecting customer to home');
+        router.replace('/(tabs)/(home)/');
+      }
     }
   }, [isAuthenticated, segments, navigationState?.key, isLoading, user, session]);
 
@@ -193,6 +203,14 @@ function RootLayoutNav() {
         options={{ 
           presentation: 'card',
           headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="debug/refresh-user" 
+        options={{ 
+          presentation: 'card',
+          headerShown: true,
+          title: 'Debug User'
         }} 
       />
       <Stack.Screen name="modal" options={{ presentation: "modal" }} />

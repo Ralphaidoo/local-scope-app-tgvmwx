@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, user_id, email, full_name, user_type, subscription_plan, business_listing_count, phone, created_at')
+        .select('id, user_id, email, full_name, user_type, role, subscription_plan, business_listing_count, phone, created_at')
         .eq('user_id', userId)
         .maybeSingle();
 
@@ -50,19 +50,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data) {
         console.log('Profile data found:', data);
         console.log('User type from DB:', data.user_type);
+        console.log('Role from DB:', data.role);
+
+        // Prioritize role field if it exists and is 'admin', otherwise use user_type
+        let finalUserType = data.user_type as UserType;
+        
+        if (data.role === 'admin' || data.user_type === 'admin') {
+          finalUserType = 'admin';
+          console.log('ADMIN USER DETECTED - Setting userType to admin');
+        }
 
         const userProfile: User = {
           id: data.id,
           email: data.email || '',
           fullName: data.full_name || '',
-          userType: data.user_type as UserType,
+          userType: finalUserType,
           phone: data.phone,
           createdAt: data.created_at || new Date().toISOString(),
           subscriptionPlan: (data.subscription_plan as SubscriptionPlan) || 'free',
           businessListingCount: data.business_listing_count || 0,
         };
 
-        console.log('Setting user profile:', userProfile);
+        console.log('Setting user profile with userType:', userProfile.userType);
         setUser(userProfile);
         setRefreshCounter(prev => prev + 1);
         console.log('User state updated successfully');
@@ -187,7 +196,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Login successful, user_id:', data.user?.id);
       
       if (data.session?.user?.id) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Wait a bit longer to ensure the profile is created/updated
+        await new Promise(resolve => setTimeout(resolve, 800));
+        await loadProfile(data.session.user.id);
+        
+        // Force a second load to ensure we have the latest data
+        await new Promise(resolve => setTimeout(resolve, 200));
         await loadProfile(data.session.user.id);
       }
       
@@ -224,7 +238,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Signup successful, user_id:', authData.user?.id);
       
       if (authData.session?.user?.id) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 800));
+        await loadProfile(authData.session.user.id);
+        
+        // Force a second load to ensure we have the latest data
+        await new Promise(resolve => setTimeout(resolve, 200));
         await loadProfile(authData.session.user.id);
       }
 
